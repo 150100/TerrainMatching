@@ -386,6 +386,7 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 			// create new intersection event
 			EventPoint ep(v_int, EventPoint::CROSSING);
 			events.push(ep);
+			return true;
 		}
 
 		else if ((vd1L.x > x || x > vd1R.x) && (min_y < y || y < max_y))// segments not intersect...

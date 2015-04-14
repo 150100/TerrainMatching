@@ -6,6 +6,7 @@
 #include <list>
 #include <queue>
 #include <set>
+#include <map>
 #include <functional>
 
 #include "terrain.h"
@@ -165,9 +166,12 @@ private:
 			}
 		};
 
-		struct EdgeDataCompare
+		class EdgeDataCompare
 		{
-			bool operator()(const EdgeData *ed1, const EdgeData *ed2) const;
+			SweepLine *sweepLine;
+		public:
+			EdgeDataCompare(SweepLine *sl) { sweepLine = sl; }
+			bool operator()(const EdgeData *ed1, const EdgeData *ed2) const; // ed1 < ed2
 		};
 
 		typedef std::priority_queue<EventPoint, std::vector<EventPoint>, std::greater<EventPoint>> EventQueue;
@@ -176,13 +180,15 @@ private:
 		
 		Arrangement *parent;
 		EventQueue events;
-		EdgeDataSet edgeDataBBT; 
+		EdgeDataSet edgeDataBBT;
 		int eventCount;
 
 		bool handleIntersectionEventWithDCEL(EdgeData *ed1, EdgeData *ed2);
 
 	public:
 		SweepLine(Arrangement *_parent);
+
+		double getX() { return events.top().x; }
 
 		void advance();
 		void run() { while (!events.empty()) advance(); };

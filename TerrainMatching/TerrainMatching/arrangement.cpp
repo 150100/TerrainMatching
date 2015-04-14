@@ -217,6 +217,7 @@ bool Arrangement::SweepLine::EdgeDataCompare::operator()(const EdgeData *ed1, co
 	VertexData &vd1R = ed1->halfEdge_down->getOrigin()->getData();
 	VertexData &vd2L = ed2->halfEdge_up->getOrigin()->getData();
 	VertexData &vd2R = ed2->halfEdge_down->getOrigin()->getData();
+	double x_sweepLine = sweepLine->getX();
 
 	/* CHECK : ed2 is below ed1 */
 	// == inner product of +90-deg rotated v_1L_1R and v_1L_2 is positive
@@ -383,13 +384,9 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 }
 
 Arrangement::SweepLine::SweepLine(Arrangement *_parent)
+	: edgeDataBBT(EdgeDataSet(EdgeDataCompare(this)))
+	, parent(_parent), eventCount(0)
 {
-	// Set parent
-	parent = _parent;
-
-	// initialize count of passed events
-	eventCount = 0;
-
 	// Insert event points related to the end points of edges
 	for (unsigned int i = 0; i < parent->edgeDataContainer.size(); ++i)
 	{

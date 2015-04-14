@@ -269,29 +269,39 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 	}
 	else {
 		// Intersection point of two "lines"
-		double x = (B_2 * C_1 - B_1 * C_2) / det;
-		double y = (A_1 * C_2 - A_2 * C_1) / det;
+		double x_det = (B_2 * C_1 - B_1 * C_2);
+		double y_det = (A_1 * C_2 - A_2 * C_1);
 		double max_y = vd1L.y > vd1R.y ? vd1L.y : vd1R.y;
 		double min_y = vd1L.y > vd1R.y ? vd1R.y : vd1L.y;
 
 		// (x,y) in the segment endpoints? (= vd1L)
-		if (vd1L.x == x && vd1L.y == y) {
+		if (vd1L.x * det == x_det && vd1L.y * det == y_det) {
+			/*
+											he2Nu
+										¦£------------ed2N (N for new)
+								  v1L ¦£¦¥	he2Nd
+							   ¦£-----¦©	  [f2u]
+					he2u	 ¦£¦¥	  ¦¦¦¤	he1u
+				ed2----------¦¥			¦¦------------ed1
+					he2d		 [f2d]		he1d
+			*/
 
 		}
 		// (x,y) in the segment endpoints? (= vd1R)
-		else if (vd1R.x == x && vd1R.y == y) {
+		else if (vd1R.x * det == x_det && vd1R.y * det == y_det) {
 
 		}
 		// (x,y) in the segment endpoints? (= vd2L)
-		else if (vd2L.x == x && vd2L.y == y) {
+		else if (vd2L.x * det == x_det && vd2L.y * det == y_det) {
 
 		}
 		// (x,y) in the segment endpoints? (= vd2R)
-		else if (vd2R.x == x && vd2R.y == y) {
+		else if (vd2R.x * det == x_det && vd2R.y * det == y_det) {
 
 		}
 		// (x,y) in the segment range? (excluding endpoints)
-		else if (vd1L.x < x && x < vd1R.x && min_y < y && y < max_y) { // Segments intersect!
+		else if ((det > 0 && vd1L.x * det < x_det && x_det < vd1R.x * det && min_y * det < y_det && y_det < max_y * det)
+		      || (det < 0 && vd1L.x * det > x_det && x_det > vd1R.x * det && min_y * det > y_det && y_det > max_y * det)) { // Segments intersect!
 
 
 			/*
@@ -312,8 +322,8 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 			// create a new intersection vertex
 			parent->vertices.push_back( Vertex() );
 			Vertex *v_int = &parent->vertices.back();
-			v_int->getData().x = x;
-			v_int->getData().y = y;
+			v_int->getData().x = x_det / det;
+			v_int->getData().y = y_det / det;
 
 			// create four halfedges for ed1 and ed2 after v
 			parent->edges.insert(parent->edges.end(), 4, HalfEdge());
@@ -390,15 +400,10 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 			events.push(ep);
 			return true;
 		}
-
-		else if ((vd1L.x > x || x > vd1R.x) && (min_y < y || y < max_y))// segments not intersect...
-			return false;
-		else {
-			throw cpp::Exception("Floating point error. (intersection range mismatch)");
+		else { // segments not intersect.
 			return false;
 		}
 	}
-	return false;
 }
 
 Arrangement::SweepLine::SweepLine(Arrangement *_parent)
@@ -416,6 +421,7 @@ Arrangement::SweepLine::SweepLine(Arrangement *_parent)
 
 void Arrangement::SweepLine::advance()
 {
+	// Split all the edges, and merge them. (inefficient)
 	// Handle all the neighbor edges of the event vertex.
 	EdgeIterator eit(events.top().vertex);
 	VertexData &vd_origin = events.top().vertex->getData();

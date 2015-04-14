@@ -274,34 +274,9 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 		double max_y = vd1L.y > vd1R.y ? vd1L.y : vd1R.y;
 		double min_y = vd1L.y > vd1R.y ? vd1R.y : vd1L.y;
 
-		// (x,y) in the segment endpoints? (= vd1L)
-		if (vd1L.x * det == x_det && vd1L.y * det == y_det) {
-			/*
-											he2Nu
-										¦£------------ed2N (N for new)
-								  v1L ¦£¦¥	he2Nd
-							   ¦£-----¦©	  [f2u]
-					he2u	 ¦£¦¥	  ¦¦¦¤	he1u
-				ed2----------¦¥			¦¦------------ed1
-					he2d		 [f2d]		he1d
-			*/
-
-		}
-		// (x,y) in the segment endpoints? (= vd1R)
-		else if (vd1R.x * det == x_det && vd1R.y * det == y_det) {
-
-		}
-		// (x,y) in the segment endpoints? (= vd2L)
-		else if (vd2L.x * det == x_det && vd2L.y * det == y_det) {
-
-		}
-		// (x,y) in the segment endpoints? (= vd2R)
-		else if (vd2R.x * det == x_det && vd2R.y * det == y_det) {
-
-		}
 		// (x,y) in the segment range? (excluding endpoints)
-		else if ((det > 0 && vd1L.x * det < x_det && x_det < vd1R.x * det && min_y * det < y_det && y_det < max_y * det)
-		      || (det < 0 && vd1L.x * det > x_det && x_det > vd1R.x * det && min_y * det > y_det && y_det > max_y * det)) { // Segments intersect!
+		if ((det > 0 && vd1L.x * det <= x_det && x_det <= vd1R.x * det && min_y * det <= y_det && y_det <= max_y * det)
+		 || (det < 0 && vd1L.x * det >= x_det && x_det >= vd1R.x * det && min_y * det >= y_det && y_det >= max_y * det)) { // Segments intersect!
 
 
 			/*
@@ -396,7 +371,7 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 			if (f2d != NULL) f2d->setBoundary(he2d);
 
 			// create new intersection event
-			EventPoint ep(v_int, EventPoint::CROSSING);
+			EventPoint ep(ed1, ed2, ed1N, ed2N, v_int, EventPoint::CROSSING);
 			events.push(ep);
 			return true;
 		}
@@ -411,63 +386,69 @@ Arrangement::SweepLine::SweepLine(Arrangement *_parent)
 	// Set parent
 	parent = _parent;
 
+	// initialize count of passed events
+	eventCount = 0;
+
 	// Insert event points related to the end points of edges
-	for (unsigned int i = 0; i < parent->vertices.size(); ++i)
+	for (unsigned int i = 0; i < parent->edgeDataContainer.size(); ++i)
 	{
-		Vertex &v = parent->vertices.at(i);
-		events.push(EventPoint(&v, EventPoint::ENDPOINT));
+		EdgeData *ed = &parent->edgeDataContainer.at(i);
+		events.push(EventPoint(ed, EventPoint::STARTPOINT));
 	}
 }
 
 void Arrangement::SweepLine::advance()
 {
 	// Split all the edges, and merge them. (inefficient)
-	// Handle all the neighbor edges of the event vertex.
-	EdgeIterator eit(events.top().vertex);
-	VertexData &vd_origin = events.top().vertex->getData();
-	events.pop();
-	while (eit.hasNext())
+	EventPoint &ep = events.top();
+
+	//if (eventCount % 100 == 0) {
+		std::cerr << "Event " << eventCount << "\n";
+		std::cerr << "# of edges in BBT : " << edgeDataBBT.size() << "\n";
+	//}
+
+	if (ep.state == EventPoint::STARTPOINT)
 	{
-		HalfEdge *he = eit.getNext();
-		EdgeData *he_ed = he->getData().edgeData;
-		VertexData &vd_dest = he->getTwin()->getOrigin()->getData();
+		// insert the edge into BBT
+		auto ret = edgeDataBBT.insert(ep.ed1);
+		
+		// check future intersections (with adjacent edges) & insert them into event
+		EdgeDataBBTIterator it, itPrev, itNext;
+		it = ret.first;
 
-		// if he is 0-length edge.
-		if (vd_dest == vd_origin) {
-			// pass
-			std::cerr << "0-length edge.\n";
-			continue;
+		itPrev = it;
+		if (itPrev != edgeDataBBT.begin()) {
+			--itPrev;
+			handleIntersectionEventWithDCEL(*itPrev, ep.ed1);
 		}
 
-		// else if he is a passed edge.
-		else if (vd_dest < vd_origin)
-			// update BBT
-			edgeDataBBT.erase(he_ed);
-
-		// else (he should be inserted.)
-		else {
-			// update BBT
-			auto ret = edgeDataBBT.insert(he_ed);
-			
-			if (ret.second == false) {
-				std::cout << "Inserting same edge.\n";
-			}
-
-			// check future intersections (with adjacent edges) & insert them into event
-			EdgeDataBBTIterator it, itPrev, itNext;
-			it = ret.first;
-
-			itPrev = it;
-			if (itPrev != edgeDataBBT.begin()) {
-				--itPrev;
-				handleIntersectionEventWithDCEL(*itPrev, he_ed);
-			}
-
-			itNext = it;
-			++itNext;
-			if (itNext != edgeDataBBT.end()) {
-				handleIntersectionEventWithDCEL(he_ed, *itNext);
-			}
+		itNext = it;
+		++itNext;
+		if (itNext != edgeDataBBT.end()) {
+			handleIntersectionEventWithDCEL(ep.ed1, *itNext);
 		}
+
+		// insert future deletion
+		events.push(EventPoint(ep.ed1, EventPoint::ENDPOINT));
 	}
+	else if (ep.state == EventPoint::ENDPOINT) 
+	{
+		edgeDataBBT.erase(ep.ed1);
+	}
+	else if (ep.state == EventPoint::CROSSING)
+	{
+		edgeDataBBT.erase(ep.ed1);
+		edgeDataBBT.erase(ep.ed2);
+		edgeDataBBT.insert(ep.ed1N);
+		edgeDataBBT.insert(ep.ed2N);
+
+		// insert future deletion
+		events.push(EventPoint(ep.ed1N, EventPoint::ENDPOINT));
+		events.push(EventPoint(ep.ed2N, EventPoint::ENDPOINT));
+	}
+	else
+		throw cpp::Exception("Invalid event state.");
+
+	++eventCount;
+	events.pop();
 }

@@ -127,17 +127,39 @@ private:
 		class EventPoint
 		{
 		public:
-			enum EventState { ENDPOINT, CROSSING };
-			Vertex *vertex;
+			enum EventState { STARTPOINT, ENDPOINT, CROSSING };
+			EdgeData *ed1, *ed2, *ed1N, *ed2N;
 			double x, y;
 			EventState state;
 
-			EventPoint(Vertex *_vertex, EventState _state) {
-				vertex = _vertex;
-				x = _vertex->getData().x;
-				y = _vertex->getData().y;
+			EventPoint(EdgeData *_ed1, EventState _state) {
+				ed1 = _ed1;
 				state = _state;
+
+				if (state == STARTPOINT) {
+					x = ed1->halfEdge_up->getOrigin()->getData().x;
+					y = ed1->halfEdge_up->getOrigin()->getData().y;
+				}
+				else if (state == ENDPOINT) {
+					x = ed1->halfEdge_down->getOrigin()->getData().x;
+					y = ed1->halfEdge_down->getOrigin()->getData().y;
+				}
+				else throw cpp::Exception("Invalid creation of ep. (state invalid)");
 			}
+			EventPoint(EdgeData *_ed1, EdgeData *_ed2, EdgeData *_ed1N, EdgeData *_ed2N, Vertex *int_v, EventState _state) {
+				ed1 = _ed1;
+				ed2 = _ed2;
+				ed1N = _ed1N;
+				ed2N = _ed2N;
+				state = _state;
+
+				if (state == CROSSING) {
+					x = int_v->getData().x;
+					y = int_v->getData().y;
+				}
+				else throw cpp::Exception("Invalid creation of ep. (state invalid)");
+			}
+
 			bool operator>(const EventPoint &ep) const {
 				return x > ep.x || (x == ep.x && y > ep.y); 
 			}
@@ -155,6 +177,7 @@ private:
 		Arrangement *parent;
 		EventQueue events;
 		EdgeDataSet edgeDataBBT; 
+		int eventCount;
 
 		bool handleIntersectionEventWithDCEL(EdgeData *ed1, EdgeData *ed2);
 

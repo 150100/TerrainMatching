@@ -403,7 +403,7 @@ void Arrangement::SweepLine::advance()
 	// Split all the edges, and merge them. (inefficient)
 	EventPoint &ep = events.top();
 
-	if (eventCount % 100 == 23) {
+	if (eventCount % 100 == 0) {
 		std::cerr << "Event " << eventCount << "\n";
 		std::cerr << "# of edges in BBT : " << edgeDataBBT.size() << "\n";
 	}

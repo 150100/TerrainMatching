@@ -6,10 +6,10 @@
 #include <iostream>
 #include <list>
 
-#include "DCEL/DCELStream.h"
-#include "DCEL/Mesh.h"
-#include "DCEL/WavefrontObjImporter.h"
-#include "DCEL/Vector3.h"
+#include "DCELStream.h"
+#include "Mesh.h"
+#include "WavefrontObjImporter.h"
+#include "Vector3.h"
 #include <fstream>
 #include <limits>
 

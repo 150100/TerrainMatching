@@ -16,6 +16,9 @@
     <Filter Include="DCEL">
       <UniqueIdentifier>{a5c06010-d734-446d-a720-51075c722397}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RBTree">
+      <UniqueIdentifier>{fe73b4c2-a535-41a5-8230-77f7c41d4794}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="arrangement.h">
@@ -39,32 +42,35 @@
     <ClInclude Include="translationspacesubdivision.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="DCEL\DCELStream.h">
+    <ClInclude Include="DCELStream.h">
       <Filter>DCEL</Filter>
     </ClInclude>
-    <ClInclude Include="DCEL\EdgeIterator.h">
+    <ClInclude Include="EdgeIterator.h">
       <Filter>DCEL</Filter>
     </ClInclude>
-    <ClInclude Include="DCEL\Exception.h">
+    <ClInclude Include="Exception.h">
       <Filter>DCEL</Filter>
     </ClInclude>
-    <ClInclude Include="DCEL\Face.h">
+    <ClInclude Include="Face.h">
       <Filter>DCEL</Filter>
     </ClInclude>
-    <ClInclude Include="DCEL\HalfEdge.h">
+    <ClInclude Include="HalfEdge.h">
       <Filter>DCEL</Filter>
     </ClInclude>
-    <ClInclude Include="DCEL\Mesh.h">
+    <ClInclude Include="Mesh.h">
       <Filter>DCEL</Filter>
     </ClInclude>
-    <ClInclude Include="DCEL\Vector3.h">
+    <ClInclude Include="Vector3.h">
       <Filter>DCEL</Filter>
     </ClInclude>
-    <ClInclude Include="DCEL\Vertex.h">
+    <ClInclude Include="Vertex.h">
       <Filter>DCEL</Filter>
     </ClInclude>
-    <ClInclude Include="DCEL\WavefrontObjImporter.h">
+    <ClInclude Include="WavefrontObjImporter.h">
       <Filter>DCEL</Filter>
+    </ClInclude>
+    <ClInclude Include="RBTree.h">
+      <Filter>RBTree</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -89,8 +95,11 @@
     <ClCompile Include="translationspacesubdivision.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="DCEL\WavefrontObjImporter.cpp">
+    <ClCompile Include="WavefrontObjImporter.cpp">
       <Filter>DCEL</Filter>
+    </ClCompile>
+    <ClCompile Include="RBTree.cpp">
+      <Filter>RBTree</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -80,30 +80,32 @@
   <ItemGroup>
     <ClInclude Include="arrangement.h" />
     <ClInclude Include="combinatorialstructure.h" />
-    <ClInclude Include="DCEL\DCELStream.h" />
-    <ClInclude Include="DCEL\EdgeIterator.h" />
-    <ClInclude Include="DCEL\Exception.h" />
-    <ClInclude Include="DCEL\Face.h" />
-    <ClInclude Include="DCEL\HalfEdge.h" />
-    <ClInclude Include="DCEL\Mesh.h" />
-    <ClInclude Include="DCEL\Vector3.h" />
-    <ClInclude Include="DCEL\Vertex.h" />
-    <ClInclude Include="DCEL\WavefrontObjImporter.h" />
+    <ClInclude Include="DCELStream.h" />
+    <ClInclude Include="EdgeIterator.h" />
+    <ClInclude Include="Exception.h" />
+    <ClInclude Include="Face.h" />
+    <ClInclude Include="HalfEdge.h" />
     <ClInclude Include="matousek.h" />
+    <ClInclude Include="Mesh.h" />
     <ClInclude Include="numbertype.h" />
     <ClInclude Include="plane.h" />
+    <ClInclude Include="RBTree.h" />
     <ClInclude Include="terrain.h" />
     <ClInclude Include="translationspacesubdivision.h" />
+    <ClInclude Include="Vector3.h" />
+    <ClInclude Include="Vertex.h" />
+    <ClInclude Include="WavefrontObjImporter.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="arrangement.cpp" />
     <ClCompile Include="combinatorialstructure.cpp" />
-    <ClCompile Include="DCEL\WavefrontObjImporter.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="matousek.cpp" />
     <ClCompile Include="plane.cpp" />
+    <ClCompile Include="RBTree.cpp" />
     <ClCompile Include="terrain.cpp" />
     <ClCompile Include="translationspacesubdivision.cpp" />
+    <ClCompile Include="WavefrontObjImporter.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

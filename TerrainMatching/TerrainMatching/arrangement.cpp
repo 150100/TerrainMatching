@@ -396,6 +396,7 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 			return false;
 		}
 	}
+	return false;
 }
 
 Arrangement::SweepLine::SweepLine(Arrangement *_parent)

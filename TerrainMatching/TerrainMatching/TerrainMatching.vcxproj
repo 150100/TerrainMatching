@@ -105,13 +105,6 @@
     <ClCompile Include="terrain.cpp" />
     <ClCompile Include="translationspacesubdivision.cpp" />
   </ItemGroup>
-  <ItemGroup>
-    <Object Include="input.obj" />
-    <Object Include="input_easy.obj" />
-    <Object Include="input_easy_wide.obj" />
-    <Object Include="input_easy_wide_distort.obj" />
-    <Object Include="patch_easy.obj" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

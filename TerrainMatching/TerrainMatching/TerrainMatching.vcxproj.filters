@@ -90,11 +90,4 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
-  <ItemGroup>
-    <Object Include="input.obj" />
-    <Object Include="input_easy.obj" />
-    <Object Include="input_easy_wide.obj" />
-    <Object Include="input_easy_wide_distort.obj" />
-    <Object Include="patch_easy.obj" />
-  </ItemGroup>
 </Project>

@@ -223,7 +223,8 @@ bool Arrangement::SweepLine::EdgeDataCompare::operator()(const EdgeData *ed1, co
 	double pos = (vd1R.y - vd1L.y) * (vd2L.x - vd1L.x) + (vd1L.x - vd1R.x) * (vd2L.y - vd1L.y);
 
 	// if vd2L is exactly on ed1, check with vd2R
-	if (pos == 0)
+	double eps = 0.00000000001;
+	if (abs(pos) < eps)
 		return (vd1R.y - vd1L.y) * (vd2R.x - vd1L.x) + (vd1L.x - vd1R.x) * (vd2R.y - vd1L.y) > 0;
 	// else
 	else return pos > 0;
@@ -402,10 +403,10 @@ void Arrangement::SweepLine::advance()
 	// Split all the edges, and merge them. (inefficient)
 	EventPoint &ep = events.top();
 
-	//if (eventCount % 100 == 0) {
+	if (eventCount % 100 == 23) {
 		std::cerr << "Event " << eventCount << "\n";
 		std::cerr << "# of edges in BBT : " << edgeDataBBT.size() << "\n";
-	//}
+	}
 
 	if (ep.state == EventPoint::STARTPOINT)
 	{

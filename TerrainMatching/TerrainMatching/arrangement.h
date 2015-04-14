@@ -1,7 +1,7 @@
 #ifndef ARRANGEMENT_H
 #define ARRANGEMENT_H
 
-#include "DCEL/Mesh.h"
+#include "DCEL.h"
 #include <fstream>
 #include <list>
 #include <queue>

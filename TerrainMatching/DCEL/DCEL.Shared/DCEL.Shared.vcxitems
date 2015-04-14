@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <ItemsProjectGuid>{d46829cd-0459-4549-8be1-8667c2d7fec5}</ItemsProjectGuid>
+    <ItemsRootNamespace>DCEL</ItemsRootNamespace>
+    <ItemsProjectName>DCEL.Shared</ItemsProjectName>
+    <CodeSharingProject>248F659F-DAC5-46E8-AC09-60EC9FC95053</CodeSharingProject>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(MSBuildThisFileDirectory)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)DCEL.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)DCEL\DCELStream.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)DCEL\EdgeIterator.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)DCEL\Exception.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)DCEL\Face.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)DCEL\HalfEdge.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)DCEL\Mesh.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)DCEL\Vector3.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)DCEL\Vertex.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)DCEL\WavefrontObjImporter.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)targetver.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)pch.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)DCEL.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)DCEL\WavefrontObjImporter.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectCapability Include="SourceItemsFromImports" />
+  </ItemGroup>
+</Project>

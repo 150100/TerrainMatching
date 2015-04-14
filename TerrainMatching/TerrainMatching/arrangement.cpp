@@ -334,6 +334,8 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 			ed2N->sources = ed2->sources;
 			ed2N->halfEdge_up = he2Nu;
 			ed2N->halfEdge_down = he2Nd;
+			he1Nu->getData().edgeData = ed1N;
+			he2Nu->getData().edgeData = ed2N;
 
 			// faces to be modified
 			Face *f1u = he1u->getFace();

@@ -37,7 +37,20 @@ int main(int argc, char **argv)
         bool part_selection = false;
 
         // test : arguments
-        if (argc != 2 && argc != 3) throw cpp::Exception("Invalid arguments.");
+        if (argc > 3) throw cpp::Exception("Invalid arguments.");
+
+		// file name
+		std::string Tname, Pname;
+		if (argc == 1) {
+			std::cerr << "Enter filename of T : ";
+			std::cin >> Tname;
+			std::cerr << "Enter filename of P : ";
+			std::cin >> Pname;
+		}
+		else {
+			Tname = argv[1];
+			Pname = argv[2];
+		}
 
         // build a terrain T
         Terrain T;

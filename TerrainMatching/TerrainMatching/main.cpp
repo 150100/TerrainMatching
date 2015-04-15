@@ -64,9 +64,9 @@ int main(int argc, char **argv)
         std::cerr << "E = " << T.number_of_edges() << std::endl;
         std::cerr << "F = " << T.number_of_faces() << std::endl;
 
-        std::cerr << "c to continue: ";
-        std::cin >> ch;
-		if (ch != 'c') throw cpp::Exception("Wrong command.");
+  //      std::cerr << "c to continue: ";
+  //      std::cin >> ch;
+		//if (ch != 'c') throw cpp::Exception("Wrong command.");
 
 
 
@@ -98,9 +98,9 @@ int main(int argc, char **argv)
         std::cerr << "E = " << P.number_of_edges() << std::endl;
         std::cerr << "F = " << P.number_of_faces() << std::endl;
 
-        std::cerr << "c to continue: ";
-        std::cin >> ch;
-		if (ch != 'c') throw cpp::Exception("Wrong command.");
+  //      std::cerr << "c to continue: ";
+  //      std::cin >> ch;
+		//if (ch != 'c') throw cpp::Exception("Wrong command.");
 
 
 

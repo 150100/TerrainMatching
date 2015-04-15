@@ -235,12 +235,14 @@ bool Arrangement::SweepLine::EdgeDataCompare::operator()(const EdgeData *ed1, co
 	double comp_y = (vd1R.y - vd1L.y) * (sx - vd1L.x) * (vd2R.x - vd2L.x) - (vd2R.y - vd2L.y) * (sx - vd2L.x) * (vd1R.x - vd1L.x);
 
 	if (comp_y == 0) {
-		// Compare slopes
+		// Compare slope
 		// (vd1R.y - vd1L.y) / (vd1R.x - vd1L.x) = s1 < s2 = (vd2R.y - vd2L.y) / (vd2R.x - vd2L.x)
 		double comp_s = (vd1R.y - vd1L.y) * (vd2R.x - vd2L.x) - (vd2R.y - vd2L.y) * (vd1R.x - vd1L.x);
 
 		if (comp_s == 0) {
-
+			// Compare remaining length
+			// (vd1R.x - vd1L.x)^2 + (vd1R.y - vd1L.y)^2 = l1 < l2 = (vd2R.x - vd2L.x)^2 + (vd2R.y - vd2L.y)^2
+			return pow(vd1R.x - vd1L.x, 2) + pow(vd1R.y - vd1L.y, 2) < pow(vd2R.x - vd2L.x, 2) + pow(vd2R.y - vd2L.y, 2);
 		}
 		else
 			return comp_s < 0;
@@ -486,6 +488,14 @@ void Arrangement::SweepLine::advance()
 	}
 	else
 		throw cpp::Exception("Invalid event state.");
+
+	EdgeDataBBTIterator it_debug = edgeDataBBT.begin();
+	while (it_debug != edgeDataBBT.end()) {
+		std::cerr << " = ";
+		(*it_debug)->print();
+		std::cerr << '\n';
+		++it_debug;
+	}
 
 	++eventCount;
 }

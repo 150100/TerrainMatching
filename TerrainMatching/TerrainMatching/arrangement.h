@@ -35,7 +35,7 @@ public:
 	}
 
 	inline void print() {
-		std::cerr << std::setprecision(6) << '(' << x << ',' << y << ')';
+		std::cerr << '(' << x << ',' << y << ')';
 	}
 };
 

@@ -9,6 +9,7 @@
 #include <map>
 #include <functional>
 #include <iomanip>
+#include <boost\intrusive\rbtree.hpp>
 
 #include "terrain.h"
 

@@ -2,6 +2,16 @@
 
 #include <algorithm>
 
+std::vector<Arrangement::Vertex> Arrangement::vertices;
+std::vector<Arrangement::HalfEdge> Arrangement::edges;
+std::vector<Arrangement::Face> Arrangement::faces;
+std::vector<Arrangement::EdgeData> Arrangement::edgeDataContainer;
+
+Arrangement::SweepLine::EventQueue Arrangement::SweepLine::events;
+Arrangement::SweepLine::EdgeDataBBT Arrangement::SweepLine::edgeDataBBT;
+int Arrangement::SweepLine::eventCount = 0;
+Arrangement::SweepLine Arrangement::sweepLine;
+
 
 bool arrVertexCompare(Arrangement::Vertex &v1, Arrangement::Vertex &v2)
 {
@@ -207,28 +217,27 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 		throw cpp::Exception("# of Edges is not (# of Halfedges)/2.");
 
 	/// Sweepline Algorithm...
-	SweepLine sweepLine(this);
+	sweepLine.initialize();
 	sweepLine.run();
 }
 
-bool Arrangement::SweepLine::EdgeDataCompare::operator()(const EdgeData *ed1, const EdgeData *ed2) const
+bool Arrangement::SweepLine::EdgeDataCompare::operator()(const EdgeData *ed1, const EdgeData *ed2) const // return ed1 < ed2
 {
 	VertexData &vd1L = ed1->halfEdge_up->getOrigin()->getData();
 	VertexData &vd1R = ed1->halfEdge_down->getOrigin()->getData();
 	VertexData &vd2L = ed2->halfEdge_up->getOrigin()->getData();
 	VertexData &vd2R = ed2->halfEdge_down->getOrigin()->getData();
-	double x_sweepLine = sweepLine->getX();
-
-	/* CHECK : ed2 is below ed1 */
-	// == inner product of +90-deg rotated v_1L_1R and v_1L_2 is positive
-	double pos = (vd1R.y - vd1L.y) * (vd2L.x - vd1L.x) + (vd1L.x - vd1R.x) * (vd2L.y - vd1L.y);
-
-	// if vd2L is exactly on ed1, check with vd2R
-	double eps = 0.00000000001;
-	if (abs(pos) < eps)
-		return (vd1R.y - vd1L.y) * (vd2R.x - vd1L.x) + (vd1L.x - vd1R.x) * (vd2R.y - vd1L.y) > 0;
-	// else
-	else return pos > 0;
+	double sx = sweepLine.getX();
+	
+	// Compare y-coordinate of the intersection with the sweepLine.
+	// (vd1R.y - vd1L.y) * (sx - vd1L.x) / (vd1R.x - vd1L.x) = y1 < y2 = (vd2R.y - vd2L.y) * (sx - vd2L.x) / (vd2R.x - vd2L.x);
+	double comp = (vd1R.y - vd1L.y) * (sx - vd1L.x) * (vd2R.x - vd2L.x) - (vd2R.y - vd2L.y) * (sx - vd2L.x) * (vd1R.x - vd1L.x);
+	if (comp == 0)
+		// Compare slopes
+		// (vd1R.y - vd1L.y) / (vd1R.x - vd1L.x) = s1 < s2 = (vd2R.y - vd2L.y) / (vd2R.x - vd2L.x)
+		return (vd1R.y - vd1L.y) * (vd2R.x - vd2L.x) < (vd2R.y - vd2L.y) * (vd1R.x - vd1L.x);
+	else
+		return comp < 0;
 }
 
 // ed2 was below ed1. ed2 will go up, and ed1 will go down relatively.
@@ -297,22 +306,22 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 			HalfEdge *he2d = ed2->halfEdge_down;
 
 			// create a new intersection vertex
-			parent->vertices.push_back( Vertex() );
-			Vertex *v_int = &parent->vertices.back();
+			vertices.push_back( Vertex() );
+			Vertex *v_int = &vertices.back();
 			v_int->getData().x = x_det / det;
 			v_int->getData().y = y_det / det;
 
 			// create four halfedges for ed1 and ed2 after v
-			parent->edges.insert(parent->edges.end(), 4, HalfEdge());
-			auto heit = parent->edges.end();
+			edges.insert(edges.end(), 4, HalfEdge());
+			auto heit = edges.end();
 			HalfEdge *he1Nu = &*(--heit);
 			HalfEdge *he1Nd = &*(--heit);
 			HalfEdge *he2Nu = &*(--heit);
 			HalfEdge *he2Nd = &*(--heit);
 
 			// create two edgedata for ed1 and ed2 after v
-			parent->edgeDataContainer.insert(parent->edgeDataContainer.end(), 2, EdgeData());
-			auto edit = parent->edgeDataContainer.end();
+			edgeDataContainer.insert(edgeDataContainer.end(), 2, EdgeData());
+			auto edit = edgeDataContainer.end();
 			EdgeData *ed1N = &*(--edit);
 			EdgeData *ed2N = &*(--edit);
 			ed1N->sources = ed1->sources;
@@ -383,14 +392,12 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 	}
 }
 
-Arrangement::SweepLine::SweepLine(Arrangement *_parent)
-	: edgeDataBBT(EdgeDataSet(EdgeDataCompare(this)))
-	, parent(_parent), eventCount(0)
+void Arrangement::SweepLine::initialize()
 {
 	// Insert event points related to the end points of edges
-	for (unsigned int i = 0; i < parent->edgeDataContainer.size(); ++i)
+	for (unsigned int i = 0; i < edgeDataContainer.size(); ++i)
 	{
-		EdgeData *ed = &parent->edgeDataContainer.at(i);
+		EdgeData *ed = &edgeDataContainer.at(i);
 		events.push(EventPoint(ed, EventPoint::STARTPOINT));
 	}
 }
@@ -400,7 +407,7 @@ void Arrangement::SweepLine::advance()
 	// Split all the edges, and merge them. (inefficient)
 	EventPoint &ep = events.top();
 
-	if (eventCount % 100 == 23) {
+	if (eventCount % 100 == 0) {
 		std::cerr << "Event " << eventCount << "\n";
 		std::cerr << "# of edges in BBT : " << edgeDataBBT.size() << "\n";
 	}

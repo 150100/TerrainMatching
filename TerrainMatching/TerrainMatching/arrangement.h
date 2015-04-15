@@ -108,16 +108,16 @@ public:
 
 	~Arrangement() {}
 
-	unsigned int number_of_vertices() {return vertices.size();}
-	unsigned int number_of_halfedges() {return edges.size();}
-	unsigned int number_of_edges() {return edgeDataContainer.size();}
-    unsigned int number_of_faces() {return faces.size();}
+	static inline unsigned int number_of_vertices() {return vertices.size();}
+	static inline unsigned int number_of_halfedges() { return edges.size(); }
+	static inline unsigned int number_of_edges() { return edgeDataContainer.size(); }
+	static inline unsigned int number_of_faces() { return faces.size(); }
 
 protected:
-    std::vector<Vertex> vertices;
-    std::vector<HalfEdge> edges;
-    std::vector<Face> faces;
-	std::vector<EdgeData> edgeDataContainer;
+    static std::vector<Vertex> vertices;
+	static std::vector<HalfEdge> edges;
+	static std::vector<Face> faces;
+	static std::vector<EdgeData> edgeDataContainer;
 
 private:
 
@@ -125,10 +125,11 @@ private:
 	// BBT is sorted downward.
 	class SweepLine
 	{
+	private:
 		class EventPoint
 		{
 		public:
-			enum EventState { STARTPOINT, ENDPOINT, CROSSING };
+			static enum EventState { STARTPOINT, ENDPOINT, CROSSING };
 			EdgeData *ed1, *ed2, *ed1N, *ed2N;
 			double x, y;
 			EventState state;
@@ -168,32 +169,37 @@ private:
 
 		class EdgeDataCompare
 		{
-			SweepLine *sweepLine;
 		public:
-			EdgeDataCompare(SweepLine *sl) { sweepLine = sl; }
-			bool operator()(const EdgeData *ed1, const EdgeData *ed2) const; // ed1 < ed2
+			EdgeDataCompare() {}
+			inline bool operator()(const EdgeData *ed1, const EdgeData *ed2) const; // ed1 < ed2
 		};
 
+	public:
 		typedef std::priority_queue<EventPoint, std::vector<EventPoint>, std::greater<EventPoint>> EventQueue;
-		typedef std::set<EdgeData *, EdgeDataCompare> EdgeDataSet;
+		typedef std::set<EdgeData *, EdgeDataCompare> EdgeDataBBT;
 		typedef std::set<EdgeData *, EdgeDataCompare>::iterator EdgeDataBBTIterator;
-		
-		Arrangement *parent;
-		EventQueue events;
-		EdgeDataSet edgeDataBBT;
-		int eventCount;
 
-		bool handleIntersectionEventWithDCEL(EdgeData *ed1, EdgeData *ed2);
+	private:
+		//Arrangement *parent;
+		static EventQueue events;
+		static EdgeDataBBT edgeDataBBT;
+		static int eventCount;
+
+		static bool handleIntersectionEventWithDCEL(EdgeData *ed1, EdgeData *ed2);
 
 	public:
-		SweepLine(Arrangement *_parent);
+		SweepLine() {}
+		
+		static inline void initialize();
 
-		double getX() { return events.top().x; }
+		static inline double getX() { return events.top().x; }
 
-		void advance();
-		void run() { while (!events.empty()) advance(); };
+		static void advance();
+		static inline void run() { while (!events.empty()) advance(); };
 	};
 
+protected:
+	static SweepLine sweepLine;
 };
 
 #endif // ARRANGEMENT_H

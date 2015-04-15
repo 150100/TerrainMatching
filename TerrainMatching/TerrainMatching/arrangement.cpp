@@ -240,9 +240,7 @@ bool Arrangement::SweepLine::EdgeDataCompare::operator()(const EdgeData *ed1, co
 		double comp_s = (vd1R.y - vd1L.y) * (vd2R.x - vd2L.x) - (vd2R.y - vd2L.y) * (vd1R.x - vd1L.x);
 
 		if (comp_s == 0) {
-			// Compare remaining length
-			// (vd1R.x - vd1L.x)^2 + (vd1R.y - vd1L.y)^2 = l1 < l2 = (vd2R.x - vd2L.x)^2 + (vd2R.y - vd2L.y)^2
-			return pow(vd1R.x - vd1L.x, 2) + pow(vd1R.y - vd1L.y, 2) < pow(vd2R.x - vd2L.x, 2) + pow(vd2R.y - vd2L.y, 2);
+			return ed1 < ed2;
 		}
 		else
 			return comp_s < 0;
@@ -303,7 +301,6 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 	// (x,y) in the segment range? (excluding endpoints)
 	if ((det > 0 && vd1L.x * det <= x_det && x_det <= vd1R.x * det && min_y * det <= y_det && y_det <= max_y * det)
 	 || (det < 0 && vd1L.x * det >= x_det && x_det >= vd1R.x * det && min_y * det >= y_det && y_det >= max_y * det)) { // Segments intersect!
-
 
 		/*
 				he1u		 [f1u]		    he2Nu
@@ -399,6 +396,10 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 		// create new intersection event
 		EventPoint ep(ed1, ed2, ed1N, ed2N, v_int, EventPoint::CROSSING);
 		events.push(ep);
+
+		// delete zero-distance edges (possibly ed1, ed2) from BBT, and merge DCEL structure.
+		
+
 		return true;
 	}
 	else { // segments not intersect.
@@ -422,8 +423,7 @@ void Arrangement::SweepLine::initialize()
 void Arrangement::SweepLine::advance()
 {
 	// Split all the edges, and merge them. (inefficient)
-	EventPoint ep = events.top();
-	events.pop();
+	EventPoint &ep = events.top();
 
 	if (eventCount % 1 == 100) {
 		std::cerr << "Event " << eventCount << "\n";
@@ -465,16 +465,16 @@ void Arrangement::SweepLine::advance()
 	}
 	else if (ep.state == EventPoint::CROSSING)
 	{
-		//edgeDataBBT.erase(ep.ed1);
-		//edgeDataBBT.erase(ep.ed2);
+		edgeDataBBT.erase(ep.ed1);
+		edgeDataBBT.erase(ep.ed2);
 		edgeDataBBT.insert(ep.ed1N);
 		edgeDataBBT.insert(ep.ed2N);
-		//std::cerr << "Erase : ";
-		//ep.ed1->print();
-		//std::cerr << '\n';
-		//std::cerr << "Erase : ";
-		//ep.ed2->print();
-		//std::cerr << '\n';
+		std::cerr << "Erase : ";
+		ep.ed1->print();
+		std::cerr << '\n';
+		std::cerr << "Erase : ";
+		ep.ed2->print();
+		std::cerr << '\n';
 		std::cerr << "Insert : ";
 		ep.ed1N->print();
 		std::cerr << '\n';
@@ -497,5 +497,6 @@ void Arrangement::SweepLine::advance()
 		++it_debug;
 	}
 
+	events.pop();
 	++eventCount;
 }

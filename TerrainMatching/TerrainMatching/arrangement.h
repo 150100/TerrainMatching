@@ -9,7 +9,6 @@
 #include <map>
 #include <functional>
 #include <iomanip>
-#include <boost\intrusive\rbtree.hpp>
 
 #include "terrain.h"
 
@@ -36,7 +35,7 @@ public:
 	}
 
 	inline void print() {
-		std::cerr << '(' << x << ',' << y << ')';
+		std::cerr << std::setprecision(6) << '(' << x << ',' << y << ')';
 	}
 };
 

@@ -8,6 +8,7 @@
 #include <set>
 #include <map>
 #include <functional>
+#include <iomanip>
 
 #include "terrain.h"
 
@@ -26,11 +27,15 @@ public:
     ArrangementVertexData() {x=0; y=0;}
 	ArrangementVertexData(Terrain::VertexData &tvd) {x=tvd.p.x; y=tvd.p.y;}
 
-	bool operator< (const ArrangementVertexData &vd) const {
+	inline bool operator< (const ArrangementVertexData &vd) const {
 		return x < vd.x || (x == vd.x && y < vd.y); // lexicographical ordering
 	}
-	bool operator== (const ArrangementVertexData &vd) const {
+	inline bool operator== (const ArrangementVertexData &vd) const {
 		return x == vd.x && y == vd.y;
+	}
+
+	inline void print() {
+		std::cerr << std::setprecision(6) << '(' << x << ',' << y << ')';
 	}
 };
 
@@ -77,6 +82,11 @@ public:
 	HalfEdgeT<ArrangementVertexData, ArrangementHalfEdgeData, ArrangementFaceData> 
 		*halfEdge_up, *halfEdge_down;
 	
+	inline void print() {
+		halfEdge_up->getOrigin()->getData().print();
+		std::cerr << " -> ";
+		halfEdge_down->getOrigin()->getData().print();
+	}
 };
 
 ///
@@ -176,8 +186,8 @@ private:
 
 	public:
 		typedef std::priority_queue<EventPoint, std::vector<EventPoint>, std::greater<EventPoint>> EventQueue;
-		typedef std::set<EdgeData *, EdgeDataCompare> EdgeDataBBT;
-		typedef std::set<EdgeData *, EdgeDataCompare>::iterator EdgeDataBBTIterator;
+		typedef std::multiset<EdgeData *, EdgeDataCompare> EdgeDataBBT;
+		typedef std::multiset<EdgeData *, EdgeDataCompare>::iterator EdgeDataBBTIterator;
 
 	private:
 		//Arrangement *parent;
@@ -186,7 +196,6 @@ private:
 		static int eventCount;
 
 		static bool handleIntersectionEventWithDCEL(EdgeData *ed1, EdgeData *ed2);
-		static bool mergeTwoEdgesWithSameDirection(EdgeData *ed1, EdgeData *ed2);
 
 	public:
 		SweepLine() {}

@@ -186,6 +186,7 @@ private:
 		static int eventCount;
 
 		static bool handleIntersectionEventWithDCEL(EdgeData *ed1, EdgeData *ed2);
+		static bool mergeTwoEdgesWithSameDirection(EdgeData *ed1, EdgeData *ed2);
 
 	public:
 		SweepLine() {}

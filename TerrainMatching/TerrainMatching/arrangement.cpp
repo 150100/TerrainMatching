@@ -240,6 +240,11 @@ bool Arrangement::SweepLine::EdgeDataCompare::operator()(const EdgeData *ed1, co
 		return comp < 0;
 }
 
+bool Arrangement::SweepLine::mergeTwoEdgesWithSameDirection(EdgeData *ed1, EdgeData *ed2)
+{
+	
+}
+
 // ed2 was below ed1. ed2 will go up, and ed1 will go down relatively.
 bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, EdgeData *ed2)
 {
@@ -400,6 +405,9 @@ void Arrangement::SweepLine::initialize()
 		EdgeData *ed = &edgeDataContainer.at(i);
 		events.push(EventPoint(ed, EventPoint::STARTPOINT));
 	}
+
+	edgeDataBBT.insert(events.top().ed1);
+	events.pop();
 }
 
 void Arrangement::SweepLine::advance()
@@ -416,6 +424,10 @@ void Arrangement::SweepLine::advance()
 	{
 		// insert the edge into BBT
 		auto ret = edgeDataBBT.insert(ep.ed1);
+
+		if (ret.second == false) {
+			mergeTwoEdgesWithSameDirection(*ret.first, ep.ed1);
+		}
 		
 		// check future intersections (with adjacent edges) & insert them into event
 		EdgeDataBBTIterator it, itPrev, itNext;

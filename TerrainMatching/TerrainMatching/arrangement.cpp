@@ -242,7 +242,41 @@ bool Arrangement::SweepLine::EdgeDataCompare::operator()(const EdgeData *ed1, co
 
 bool Arrangement::SweepLine::mergeTwoEdgesWithSameDirection(EdgeData *ed1, EdgeData *ed2)
 {
-	
+	VertexData &vd1L = ed1->halfEdge_up->getOrigin()->getData();
+	VertexData &vd1R = ed1->halfEdge_down->getOrigin()->getData();
+	VertexData &vd2L = ed2->halfEdge_up->getOrigin()->getData();
+	VertexData &vd2R = ed2->halfEdge_down->getOrigin()->getData();
+
+	if (vd1L.x <= vd2L.x) {
+		if (vd1R.x <= vd2R.x) {
+			/*
+					he1u	heNu	he2u
+				¡Ü------¡Ü======¡Ü------¡Ü
+				vd1L    vd2L    vd1R    vd2R
+					he1d	heNd	he2d
+				(	ed1  )(  edN )(  ed2 )	
+			*/
+
+			HalfEdge *he1u = ed1->halfEdge_up;
+			HalfEdge *he1d = ed1->halfEdge_down;
+			HalfEdge *he2u = ed2->halfEdge_up;
+			HalfEdge *he2d = ed2->halfEdge_down;
+
+			edges.insert(edges.end(), 2, HalfEdge());
+			auto heit = edges.end();
+			HalfEdge *heNu = &*(--heit);
+			HalfEdge *NeNd = &*(--heit);
+
+			edgeDataContainer.insert(edgeDataContainer.end(), EdgeData());
+			EdgeData *edN = &edgeDataContainer.back();
+			edN->sources.insert(--edN->sources.end(), ed1->sources.begin(), ed1->sources.end());
+			edN->sources.insert(--edN->sources.end(), ed2->sources.begin(), ed2->sources.end());
+
+			he1u->setNext(heNu);
+		}
+	}
+	else
+		throw cpp::Exception("ed2 should be a fresh one. (in mergeTwoEdgesWithSameDirection)");
 }
 
 // ed2 was below ed1. ed2 will go up, and ed1 will go down relatively.

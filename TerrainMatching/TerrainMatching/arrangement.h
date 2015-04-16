@@ -309,6 +309,7 @@ private:
 		static int eventCount;
 
 		static bool handleIntersectionEventWithDCEL(EdgeData *ed1, EdgeData *ed2);
+		static std::pair<EdgeData *, EdgeData *> updateIntersectionDCEL(EdgeData *ed1, EdgeData *ed2, double int_x, double int_y);
 
 	public:
 		SweepLine() {}

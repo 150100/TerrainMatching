@@ -7,6 +7,11 @@ std::vector<Arrangement::HalfEdge> Arrangement::edges;
 std::vector<Arrangement::Face> Arrangement::faces;
 std::vector<Arrangement::EdgeData> Arrangement::edgeDataContainer;
 
+std::queue<unsigned int> Arrangement::erasedVerticesIndices;
+std::queue<unsigned int> Arrangement::erasedEdgesIndices;
+std::queue<unsigned int> Arrangement::erasedFacesIndices;
+std::queue<unsigned int> Arrangement::erasedEdgeDataContainerIndices;
+
 Arrangement::SweepLine::EventQueue Arrangement::SweepLine::events;
 Arrangement::SweepLine::EdgeDataBBT Arrangement::SweepLine::edgeDataBBT;
 int Arrangement::SweepLine::eventCount = 0;
@@ -240,7 +245,7 @@ bool Arrangement::SweepLine::EdgeDataCompare::operator()(const EdgeData *ed1, co
 		double comp_s = (vd1R.y - vd1L.y) * (vd2R.x - vd2L.x) - (vd2R.y - vd2L.y) * (vd1R.x - vd1L.x);
 
 		if (comp_s == 0) {
-			return ed1 < ed2;
+			return ed1 < ed2; // not comparable. just distinguish.
 		}
 		else
 			return comp_s < 0;
@@ -318,24 +323,19 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 		HalfEdge *he2d = ed2->halfEdge_down;
 
 		// create a new intersection vertex
-		vertices.push_back( Vertex() );
-		Vertex *v_int = &vertices.back();
+		Vertex *v_int = createVertex();
 		v_int->getData().x = x_det / det;
 		v_int->getData().y = y_det / det;
 
 		// create four halfedges for ed1 and ed2 after v
-		edges.insert(edges.end(), 4, HalfEdge());
-		auto heit = edges.end();
-		HalfEdge *he1Nu = &*(--heit);
-		HalfEdge *he1Nd = &*(--heit);
-		HalfEdge *he2Nu = &*(--heit);
-		HalfEdge *he2Nd = &*(--heit);
+		HalfEdge *he1Nu = createHalfEdge();
+		HalfEdge *he1Nd = createHalfEdge();
+		HalfEdge *he2Nu = createHalfEdge();
+		HalfEdge *he2Nd = createHalfEdge();
 
 		// create two edgedata for ed1 and ed2 after v
-		edgeDataContainer.insert(edgeDataContainer.end(), 2, EdgeData());
-		auto edit = edgeDataContainer.end();
-		EdgeData *ed1N = &*(--edit);
-		EdgeData *ed2N = &*(--edit);
+		EdgeData *ed1N = createEdgeData();
+		EdgeData *ed2N = createEdgeData();
 		ed1N->sources = ed1->sources;
 		ed1N->halfEdge_up = he1Nu;
 		ed1N->halfEdge_down = he1Nd;
@@ -388,17 +388,74 @@ bool Arrangement::SweepLine::handleIntersectionEventWithDCEL(EdgeData *ed1, Edge
 		//he2u->setNext(he1d);
 		he2d->setOrigin(v_int);
 		//he2d->setPrev(he1Nd);
-		if (f1u != NULL) f1u->setBoundary(he1u);
-		if (f1d != NULL) f1d->setBoundary(he1d);
-		if (f2u != NULL) f2u->setBoundary(he2Nd);
-		if (f2d != NULL) f2d->setBoundary(he2d);
+
+		// update face structures
+		if (f1u != NULL) {
+			f1u->setBoundary(he1u);
+			EdgeIterator eit(f1u);
+			while (eit.hasNext()) {
+				HalfEdge *he = eit.getNext();
+				he->setFace(f1u);
+			}
+		}
+		if (f1d != NULL) {
+			f1d->setBoundary(he1d);
+			EdgeIterator eit(f1d);
+			while (eit.hasNext()) {
+				HalfEdge *he = eit.getNext();
+				he->setFace(f1d);
+			}
+		}
+		if (f2u != NULL) {
+			f2u->setBoundary(he2Nd);
+			EdgeIterator eit(f2u);
+			while (eit.hasNext()) {
+				HalfEdge *he = eit.getNext();
+				he->setFace(f2u);
+			}
+		}
+		if (f2d != NULL) {
+			f2d->setBoundary(he2d);
+			EdgeIterator eit(f2d);
+			while (eit.hasNext()) {
+				HalfEdge *he = eit.getNext();
+				he->setFace(f2d);
+			}
+		}
 
 		// create new intersection event
 		EventPoint ep(ed1, ed2, ed1N, ed2N, v_int, EventPoint::CROSSING);
 		events.push(ep);
 
 		// delete zero-distance edges (possibly ed1, ed2) from BBT, and merge DCEL structure.
-		
+		if (he1u->getOrigin()->getData() == he1d->getOrigin()->getData())
+		{
+			// edge link
+			Vertex *v = he1u->getOrigin();
+			he1u->getPrev()->setNext(he1u->getNext());
+			//he1u->getNext()->setPrev(he1u->getPrev());
+			he1d->getPrev()->setNext(he1d->getNext());
+			//he1d->getNext()->setPrev(he1u->getPrev());
+			v->setIncidentEdge(he1u->getNext());
+
+			// erase v (lazy)
+			unsigned int id = v - &(vertices[0]);
+			deleteVertex(id);
+		}
+		if (he2u->getOrigin()->getData() == he2d->getOrigin()->getData())
+		{
+			// edge link
+			Vertex *v = he2u->getOrigin();
+			he2u->getPrev()->setNext(he2u->getNext());
+			//he2u->getNext()->setPrev(he2u->getPrev());
+			he2d->getPrev()->setNext(he2d->getNext());
+			//he2d->getNext()->setPrev(he2u->getPrev());
+			v->setIncidentEdge(he2u->getNext());
+
+			// erase v (lazy)
+			unsigned int id = v - &(vertices[0]);
+			deleteVertex(id);
+		}
 
 		return true;
 	}
@@ -458,8 +515,7 @@ void Arrangement::SweepLine::advance()
 	}
 	else if (ep.state == EventPoint::ENDPOINT) 
 	{
-		edgeDataBBT.erase(ep.ed1);
-		std::cerr << "Erase : ";
+		unsigned int erase_num = edgeDataBBT.erase(ep.ed1);
 		ep.ed1->print();
 		std::cerr << '\n';
 	}

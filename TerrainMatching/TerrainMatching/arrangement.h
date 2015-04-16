@@ -91,6 +91,7 @@ public:
 
 ///
 
+// TO DO : This should be singleton.
 class Arrangement
 {
 public:
@@ -117,17 +118,128 @@ public:
     Arrangement(Terrain *t1, Terrain *t2);
 
 	~Arrangement() {}
-
-	static inline unsigned int number_of_vertices() {return vertices.size();}
+	
+	static inline unsigned int number_of_vertices() { return vertices.size(); }
 	static inline unsigned int number_of_halfedges() { return edges.size(); }
 	static inline unsigned int number_of_edges() { return edgeDataContainer.size(); }
 	static inline unsigned int number_of_faces() { return faces.size(); }
 
 protected:
+	static inline Vertex* createVertex()
+	{
+		if (erasedVerticesIndices.empty()) {
+			if (vertices.capacity() == vertices.size()) {
+				throw cpp::Exception("Vertices capacity over.");
+				return NULL;
+			}
+			else {
+				vertices.push_back(Vertex());
+				return &vertices.back();
+			}
+		}
+		else {
+			unsigned int id = erasedVerticesIndices.front();
+			erasedVerticesIndices.pop();
+			vertices[id] = Vertex(); // initialize
+			return &vertices[id];
+		}
+	}
+	static inline HalfEdge* createHalfEdge()
+	{
+		if (erasedEdgesIndices.empty()) {
+			if (edges.capacity() == edges.size()) {
+				throw cpp::Exception("Edges capacity over.");
+				return NULL;
+			}
+			else {
+				edges.push_back(HalfEdge());
+				return &edges.back();
+			}
+		}
+		else {
+			unsigned int id = erasedEdgesIndices.front();
+			erasedEdgesIndices.pop();
+			edges[id] = HalfEdge(); // initialize
+			return &edges[id];
+		}
+	}
+	static inline Face* createFace()
+	{
+		if (erasedFacesIndices.empty()) {
+			if (faces.capacity() == faces.size()) {
+				throw cpp::Exception("Faces capacity over.");
+				return NULL;
+			}
+			else {
+				faces.push_back(Face());
+				return &faces.back();
+			}
+		}
+		else {
+			unsigned int id = erasedFacesIndices.front();
+			erasedFacesIndices.pop();
+			faces[id] = Face(); // initialize
+			return &faces[id];
+		}
+	}
+	static inline EdgeData* createEdgeData()
+	{
+		if (erasedEdgeDataContainerIndices.empty()) {
+			if (edgeDataContainer.capacity() == edgeDataContainer.size()) {
+				throw cpp::Exception("EdgeDataContainer capacity over.");
+				return NULL;
+			}
+			else {
+				edgeDataContainer.push_back(EdgeData());
+				return &edgeDataContainer.back();
+			}
+		}
+		else {
+			unsigned int id = erasedEdgeDataContainerIndices.front();
+			erasedEdgeDataContainerIndices.pop();
+			edgeDataContainer[id] = EdgeData(); // initialize
+			return &edgeDataContainer[id];
+		}
+	}
+
+	static inline void deleteVertex(unsigned int id) 
+	{
+		if (id >= vertices.size())
+			throw cpp::Exception("Delete vertices-index exceeds the size.");
+		else
+			erasedVerticesIndices.push(id);
+	}
+	static inline void deleteHalfEdge(unsigned int id)
+	{
+		if (id >= edges.size())
+			throw cpp::Exception("Delete edges-index exceeds the size.");
+		else
+			erasedEdgesIndices.push(id);
+	}
+	static inline void deleteFace(unsigned int id)
+	{
+		if (id >= faces.size())
+			throw cpp::Exception("Delete faces-index exceeds the size.");
+		else
+			erasedFacesIndices.push(id);
+	}
+	static inline void deleteEdgeData(unsigned int id)
+	{
+		if (id >= edgeDataContainer.size())
+			throw cpp::Exception("Delete edgeDataContainer-index exceeds the size.");
+		else
+			erasedEdgeDataContainerIndices.push(id);
+	}
+
     static std::vector<Vertex> vertices;
 	static std::vector<HalfEdge> edges;
 	static std::vector<Face> faces;
 	static std::vector<EdgeData> edgeDataContainer;
+
+	static std::queue<unsigned int> erasedVerticesIndices;
+	static std::queue<unsigned int> erasedEdgesIndices;
+	static std::queue<unsigned int> erasedFacesIndices;
+	static std::queue<unsigned int> erasedEdgeDataContainerIndices;
 
 private:
 
@@ -139,7 +251,7 @@ private:
 		class EventPoint
 		{
 		public:
-			static enum EventState { STARTPOINT, ENDPOINT, CROSSING };
+			static enum EventState { STARTPOINT, CROSSING, ENDPOINT };
 			EdgeData *ed1, *ed2, *ed1N, *ed2N;
 			double x, y;
 			EventState state;
@@ -173,7 +285,8 @@ private:
 			}
 
 			bool operator>(const EventPoint &ep) const {
-				return x > ep.x || (x == ep.x && y > ep.y); 
+				return x > ep.x || (x == ep.x && y > ep.y) 
+					|| (x == ep.x && y == ep.y && state < ep.state); // handle endpoint first, crossing next, startpoint last (to reduce the number of BBT)
 			}
 		};
 

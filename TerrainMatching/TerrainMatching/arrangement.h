@@ -243,6 +243,8 @@ protected:
 
 private:
 
+	static void eraseZeroLengthEdge(EdgeData *ed);
+
 	// Sweep from left to right.
 	// BBT is sorted downward.
 	class SweepLine

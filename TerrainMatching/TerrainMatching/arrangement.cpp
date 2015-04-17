@@ -226,6 +226,27 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 	sweepLine.run();
 }
 
+// erase edge(with halfedges) itself and right vertex (= halfedge_down->origin).
+// merge them into left vertex (= halfedge_up->origin).
+// make sure the edge length is 0.
+void Arrangement::eraseZeroLengthEdge(EdgeData *ed)
+{
+	Vertex *v = ed->halfEdge_up->getOrigin();
+	Vertex *v_del = ed->halfEdge_down->getOrigin();
+
+	// link edges
+	ed->halfEdge_up->getPrev()->setNext(ed->halfEdge_up->getNext());
+	ed->halfEdge_down->getPrev()->setNext(ed->halfEdge_down->getNext());
+	v->setIncidentEdge(ed->halfEdge_up->getNext());
+	
+	// merge incident edges of v_del into v
+	
+
+	// erase v (lazy)
+	unsigned int id = v_del - &(vertices[0]);
+	deleteVertex(id);
+}
+
 bool Arrangement::SweepLine::EdgeDataCompare::operator()(const EdgeData *ed1, const EdgeData *ed2) const // return ed1 < ed2
 {
 	VertexData &vd1L = ed1->halfEdge_up->getOrigin()->getData();
@@ -471,6 +492,20 @@ Arrangement::SweepLine::updateIntersectionDCEL(EdgeData *ed1, EdgeData *ed2, dou
 	he2d->setOrigin(v_int);
 	//he2d->setPrev(he1Nd);
 
+	// delete zero-distance edges (possibly ed1, ed2) from BBT, and merge DCEL structure.
+	if (he1u->getOrigin()->getData() == he1d->getOrigin()->getData()) {
+		eraseZeroLengthEdge(ed1);
+	}
+	if (he2u->getOrigin()->getData() == he2d->getOrigin()->getData()) {
+		eraseZeroLengthEdge(ed2);
+	}
+	if (he1Nu->getOrigin()->getData() == he1Nd->getOrigin()->getData()) {
+		eraseZeroLengthEdge(ed1N);
+	}
+	if (he2Nu->getOrigin()->getData() == he2Nd->getOrigin()->getData()) {
+		eraseZeroLengthEdge(ed2N);
+	}
+
 	// update face structures
 	if (f1u != NULL) {
 		f1u->setBoundary(he1u);
@@ -508,68 +543,6 @@ Arrangement::SweepLine::updateIntersectionDCEL(EdgeData *ed1, EdgeData *ed2, dou
 	// create new intersection event
 	EventPoint ep(ed1, ed2, ed1N, ed2N, v_int, EventPoint::CROSSING);
 	events.push(ep);
-
-	// delete zero-distance edges (possibly ed1, ed2) from BBT, and merge DCEL structure.
-	if (he1u->getOrigin()->getData() == he1d->getOrigin()->getData())
-	{
-		// edge link
-		Vertex *vu = he1u->getOrigin(); // merging vertex
-		Vertex *vd = he1d->getOrigin(); // deleting vertex
-		he1u->getPrev()->setNext(he1u->getNext());
-		//he1u->getNext()->setPrev(he1u->getPrev());
-		he1d->getPrev()->setNext(he1d->getNext());
-		//he1d->getNext()->setPrev(he1u->getPrev());
-		vu->setIncidentEdge(he1u->getNext());
-
-		// erase vd (lazy)
-		unsigned int id = vd - &(vertices[0]);
-		deleteVertex(id);
-	}
-	if (he2u->getOrigin()->getData() == he2d->getOrigin()->getData())
-	{
-		// edge link
-		Vertex *vu = he2u->getOrigin(); // merging vertex
-		Vertex *vd = he2d->getOrigin(); // deleting vertex
-		he2u->getPrev()->setNext(he2u->getNext());
-		//he2u->getNext()->setPrev(he2u->getPrev());
-		he2d->getPrev()->setNext(he2d->getNext());
-		//he2d->getNext()->setPrev(he2u->getPrev());
-		vu->setIncidentEdge(he2u->getNext());
-
-		// erase v (lazy)
-		unsigned int id = vd - &(vertices[0]);
-		deleteVertex(id);
-	}
-	if (he1Nu->getOrigin()->getData() == he1Nd->getOrigin()->getData())
-	{
-		// edge link
-		Vertex *vu = he1Nu->getOrigin(); // merging vertex
-		Vertex *vd = he1Nd->getOrigin(); // deleting vertex
-		he1Nu->getPrev()->setNext(he1Nu->getNext());
-		//he1u->getNext()->setPrev(he1u->getPrev());
-		he1Nd->getPrev()->setNext(he1Nd->getNext());
-		//he1d->getNext()->setPrev(he1u->getPrev());
-		vu->setIncidentEdge(he1Nu->getNext());
-
-		// erase vd (lazy)
-		unsigned int id = vd - &(vertices[0]);
-		deleteVertex(id);
-	}
-	if (he2Nu->getOrigin()->getData() == he2Nd->getOrigin()->getData())
-	{
-		// edge link
-		Vertex *vu = he2Nu->getOrigin(); // merging vertex
-		Vertex *vd = he2Nd->getOrigin(); // deleting vertex
-		he2Nu->getPrev()->setNext(he2Nu->getNext());
-		//he2u->getNext()->setPrev(he2u->getPrev());
-		he2Nd->getPrev()->setNext(he2Nd->getNext());
-		//he2d->getNext()->setPrev(he2u->getPrev());
-		vu->setIncidentEdge(he2Nu->getNext());
-
-		// erase v (lazy)
-		unsigned int id = vd - &(vertices[0]);
-		deleteVertex(id);
-	}
 
 	// returns (ed1N, ed2N)
 	return std::pair<EdgeData *, EdgeData *>(ed1N, ed2N);

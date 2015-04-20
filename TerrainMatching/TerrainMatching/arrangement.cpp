@@ -17,6 +17,34 @@ Arrangement::SweepLine::EdgeDataBBT Arrangement::SweepLine::edgeDataBBT;
 int Arrangement::SweepLine::eventCount = 0;
 Arrangement::SweepLine Arrangement::sweepLine;
 
+template <class T>
+class Vector2
+{
+private:
+	double x, y;
+
+public:
+	Vector2() {}
+	Vector2(double _x, double _y) : x(_x), y(_y) {}
+	Vector2(ArrangementVertexData &vd) : x(vd.x), y(vd.y) {}
+
+	// get a vector from v to *this
+	inline Vector2<T> operator-(const Vector2<T> &v) const { 
+		return Vector2<T>(x - v.x, y - v.y); 
+	}
+	// dot product
+	inline double operator*(const Vector2<T> &v) const {
+		return x * v.x + y * v.y; 
+	}
+	// determinant of *this and v (>0 if *this is left from v, <0 if *this is right from v.)
+	inline double det(const Vector2<T> &v) const {
+		return x * v.y - v.x * y;
+	}
+	// true if *this is left from v, false otherwise.
+	inline bool isLeftFrom(const Vector2<T> &v) const {
+		return det(v) > 0;
+	}
+};
 
 bool arrVertexCompare(Arrangement::Vertex &v1, Arrangement::Vertex &v2)
 {
@@ -232,15 +260,70 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 void Arrangement::eraseZeroLengthEdge(EdgeData *ed)
 {
 	Vertex *v = ed->halfEdge_up->getOrigin();
+	Vector2<double> vec_v(v->getData());
 	Vertex *v_del = ed->halfEdge_down->getOrigin();
+	Vector2<double> vec_v_del(v_del->getData());
 
 	// link edges
 	ed->halfEdge_up->getPrev()->setNext(ed->halfEdge_up->getNext());
 	ed->halfEdge_down->getPrev()->setNext(ed->halfEdge_down->getNext());
 	v->setIncidentEdge(ed->halfEdge_up->getNext());
 	
-	// merge incident edges of v_del into v
-	
+	// if only the vertices are not from the same subdivision
+	if (v->getIncidentEdge() != v_del->getIncidentEdge()) {
+		// merge incident edges of v_del into v
+		/*
+			   ¦£-¡æhe_prev (from v)
+			   ¦£-¦¥(face from v)
+			   ¦«----¡æhe (from v_del)
+			   ¦¦-¦¤(face from v_del)
+			   ¦¦-¡æhe_next (from v)
+			   */
+		EdgeIterator eit(v);
+		HalfEdge *he_prev = eit.getNext();
+		Vector2<double> vec_he_prev = Vector2<double>(he_prev->getTwin()->getOrigin()->getData()) - vec_v;
+		HalfEdge *he_next;
+		EdgeIterator eit_del(v_del);
+		while (eit_del.hasNext()) {
+			HalfEdge *he = eit_del.getNext();
+
+			// get next one
+			if (eit.hasNext()) {
+				he_next = eit.getNext();
+			}
+			else {
+				eit.reset();
+				he_next = eit.getNext();
+			}
+
+			Vector2<double> vec_he = Vector2<double>(he->getTwin()->getOrigin()->getData()) - vec_v_del;
+			Vector2<double> vec_he_next = Vector2<double>(he_next->getTwin()->getOrigin()->getData()) - vec_v;
+			if (vec_he_prev * vec_he_next < 0) { // reflex angle
+				if (!vec_he.isLeftFrom(vec_he_prev) || vec_he.isLeftFrom(vec_he_next)) { // if he is in prev~next
+					// link edges of v_del to v
+					he_prev->getTwin()->setNext(he);
+					he_next->setPrev(he);
+					// link faces of v_del to v
+					he->setFace(he_prev->getTwin()->getFace());
+					he_next->setFace(he->getTwin()->getFace());
+				}
+			}
+			else { // not reflex angle
+				if (!vec_he.isLeftFrom(vec_he_prev) && vec_he.isLeftFrom(vec_he_next)) { // if he is in prev~next
+					// link edges of v_del to v
+					he_prev->getTwin()->setNext(he);
+					he_next->setPrev(he);
+					// link faces of v_del to v
+					he->setFace(he_prev->getTwin()->getFace());
+					he_next->setFace(he->getTwin()->getFace());
+				}
+			}
+
+			// store previous one
+			he_prev = he_next;
+			vec_he_prev = vec_he_next;
+		}
+	}
 
 	// erase v (lazy)
 	unsigned int id = v_del - &(vertices[0]);

@@ -24,8 +24,8 @@ class ArrangementVertexData
 public:
     double x,y; // coordinates
 
-    ArrangementVertexData() {x=0; y=0;}
-	ArrangementVertexData(Terrain::VertexData &tvd) {x=tvd.p.x; y=tvd.p.y;}
+    ArrangementVertexData() { x = 0; y = 0; }
+	ArrangementVertexData(Terrain::VertexData &tvd) { x = tvd.p.x; y = tvd.p.y; }
 
 	inline bool operator< (const ArrangementVertexData &vd) const {
 		return x < vd.x || (x == vd.x && y < vd.y); // lexicographical ordering

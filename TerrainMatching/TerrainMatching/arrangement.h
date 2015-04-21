@@ -72,6 +72,10 @@ public:
 		TerrainHalfEdge *he; // copied edge
 		TerrainVertex *v; // reference point
 		bool he_is_from_patch; // Terrain edge e is from patch?
+
+		bool operator==(const Source &s) const {
+			return he == s.he && v == s.v && he_is_from_patch == s.he_is_from_patch;
+		}
 	};
 
 	typedef std::vector<Source>::iterator SourceIterator;
@@ -115,17 +119,16 @@ public:
 	typedef FaceT<VertexData, HalfEdgeData, FaceData> Face;
 	typedef EdgeIteratorT<VertexData, HalfEdgeData, FaceData> EdgeIterator;
 
+	Arrangement() {}
     Arrangement(Terrain *t1, Terrain *t2);
 
 	~Arrangement() {}
 	
-	static inline unsigned int number_of_vertices() { return vertices.size(); }
-	static inline unsigned int number_of_halfedges() { return edges.size(); }
-	static inline unsigned int number_of_edges() { return edgeDataContainer.size(); }
-	static inline unsigned int number_of_faces() { return faces.size(); }
-
-protected:
-	static inline Vertex* createVertex()
+	inline unsigned int number_of_vertices() { return vertices.size(); }
+	inline unsigned int number_of_halfedges() { return edges.size(); }
+	inline unsigned int number_of_edges() { return edgeDataContainer.size(); }
+	inline unsigned int number_of_faces() { return faces.size(); }
+	inline Vertex* createVertex()
 	{
 		if (erasedVerticesIndices.empty()) {
 			if (vertices.capacity() == vertices.size()) {
@@ -144,7 +147,7 @@ protected:
 			return &vertices[id];
 		}
 	}
-	static inline HalfEdge* createHalfEdge()
+	inline HalfEdge* createHalfEdge()
 	{
 		if (erasedEdgesIndices.empty()) {
 			if (edges.capacity() == edges.size()) {
@@ -163,7 +166,7 @@ protected:
 			return &edges[id];
 		}
 	}
-	static inline Face* createFace()
+	inline Face* createFace()
 	{
 		if (erasedFacesIndices.empty()) {
 			if (faces.capacity() == faces.size()) {
@@ -182,7 +185,7 @@ protected:
 			return &faces[id];
 		}
 	}
-	static inline EdgeData* createEdgeData()
+	inline EdgeData* createEdgeData()
 	{
 		if (erasedEdgeDataContainerIndices.empty()) {
 			if (edgeDataContainer.capacity() == edgeDataContainer.size()) {
@@ -202,28 +205,28 @@ protected:
 		}
 	}
 
-	static inline void deleteVertex(unsigned int id) 
+	inline void deleteVertex(unsigned int id)
 	{
 		if (id >= vertices.size())
 			throw cpp::Exception("Delete vertices-index exceeds the size.");
 		else
 			erasedVerticesIndices.push(id);
 	}
-	static inline void deleteHalfEdge(unsigned int id)
+	inline void deleteHalfEdge(unsigned int id)
 	{
 		if (id >= edges.size())
 			throw cpp::Exception("Delete edges-index exceeds the size.");
 		else
 			erasedEdgesIndices.push(id);
 	}
-	static inline void deleteFace(unsigned int id)
+	inline void deleteFace(unsigned int id)
 	{
 		if (id >= faces.size())
 			throw cpp::Exception("Delete faces-index exceeds the size.");
 		else
 			erasedFacesIndices.push(id);
 	}
-	static inline void deleteEdgeData(unsigned int id)
+	inline void deleteEdgeData(unsigned int id)
 	{
 		if (id >= edgeDataContainer.size())
 			throw cpp::Exception("Delete edgeDataContainer-index exceeds the size.");
@@ -231,101 +234,99 @@ protected:
 			erasedEdgeDataContainerIndices.push(id);
 	}
 
-    static std::vector<Vertex> vertices;
-	static std::vector<HalfEdge> edges;
-	static std::vector<Face> faces;
-	static std::vector<EdgeData> edgeDataContainer;
+	void getOverlay(Arrangement *overlay) {
+		sweepLine.initialize(this, overlay);
+		sweepLine.getOverlay();
+	}
 
-	static std::queue<unsigned int> erasedVerticesIndices;
-	static std::queue<unsigned int> erasedEdgesIndices;
-	static std::queue<unsigned int> erasedFacesIndices;
-	static std::queue<unsigned int> erasedEdgeDataContainerIndices;
+	std::vector<Vertex> vertices;
+	std::vector<HalfEdge> edges;
+	std::vector<Face> faces;
+	std::vector<EdgeData> edgeDataContainer;
 
+protected:
+	std::queue<unsigned int> erasedVerticesIndices;
+	std::queue<unsigned int> erasedEdgesIndices;
+	std::queue<unsigned int> erasedFacesIndices;
+	std::queue<unsigned int> erasedEdgeDataContainerIndices;
+	
 private:
-
 	static void eraseZeroLengthEdge(EdgeData *ed);
-
-	// Sweep from left to right.
-	// BBT is sorted downward.
-	class SweepLine
-	{
-	private:
-		class EventPoint
-		{
-		public:
-			static enum EventState { STARTPOINT, CROSSING, ENDPOINT };
-			EdgeData *ed1, *ed2, *ed1N, *ed2N;
-			double x, y;
-			EventState state;
-
-			EventPoint(EdgeData *_ed1, EventState _state) {
-				ed1 = _ed1;
-				state = _state;
-
-				if (state == STARTPOINT) {
-					x = ed1->halfEdge_up->getOrigin()->getData().x;
-					y = ed1->halfEdge_up->getOrigin()->getData().y;
-				}
-				else if (state == ENDPOINT) {
-					x = ed1->halfEdge_down->getOrigin()->getData().x;
-					y = ed1->halfEdge_down->getOrigin()->getData().y;
-				}
-				else throw cpp::Exception("Invalid creation of ep. (state invalid)");
-			}
-			EventPoint(EdgeData *_ed1, EdgeData *_ed2, EdgeData *_ed1N, EdgeData *_ed2N, Vertex *int_v, EventState _state) {
-				ed1 = _ed1;
-				ed2 = _ed2;
-				ed1N = _ed1N;
-				ed2N = _ed2N;
-				state = _state;
-
-				if (state == CROSSING) {
-					x = int_v->getData().x;
-					y = int_v->getData().y;
-				}
-				else throw cpp::Exception("Invalid creation of ep. (state invalid)");
-			}
-
-			bool operator>(const EventPoint &ep) const {
-				return x > ep.x || (x == ep.x && y > ep.y) 
-					|| (x == ep.x && y == ep.y && state < ep.state); // handle endpoint first, crossing next, startpoint last (to reduce the number of BBT)
-			}
-		};
-
-		class EdgeDataCompare
-		{
-		public:
-			EdgeDataCompare() {}
-			inline bool operator()(const EdgeData *ed1, const EdgeData *ed2) const; // ed1 < ed2
-		};
-
-	public:
-		typedef std::priority_queue<EventPoint, std::vector<EventPoint>, std::greater<EventPoint>> EventQueue;
-		typedef std::multiset<EdgeData *, EdgeDataCompare> EdgeDataBBT;
-		typedef std::multiset<EdgeData *, EdgeDataCompare>::iterator EdgeDataBBTIterator;
-
-	private:
-		//Arrangement *parent;
-		static EventQueue events;
-		static EdgeDataBBT edgeDataBBT;
-		static int eventCount;
-
-		static bool handleIntersectionEventWithDCEL(EdgeData *ed1, EdgeData *ed2);
-		static std::pair<EdgeData *, EdgeData *> updateIntersectionDCEL(EdgeData *ed1, EdgeData *ed2, double int_x, double int_y);
-
-	public:
-		SweepLine() {}
-		
-		static inline void initialize();
-
-		static inline double getX() { return events.top().x; }
-
-		static void advance();
-		static inline void run() { while (!events.empty()) advance(); };
-	};
 
 protected:
 	static SweepLine sweepLine;
+};
+
+// Sweep from left to right.
+// BBT is sorted downward.
+class SweepLine
+{
+private:
+	class EventPoint
+	{
+	public:
+		static enum EventState { VERTEXPOINT, CROSSINGPOINT };
+		Arrangement::Vertex *v;
+		Arrangement::EdgeData *ed1, *ed2;
+		double x, y;
+		EventState state;
+
+		EventPoint(Arrangement::Vertex *_v) { // vertex point
+			v = _v;
+			ed1 = NULL;
+			ed2 = NULL;
+			x = v->getData().x;
+			y = v->getData().y;
+			state = VERTEXPOINT;
+		}
+		EventPoint(Arrangement::EdgeData *_ed1, Arrangement::EdgeData *_ed2, double _x, double _y) { // crossing point
+			x = NULL;
+			ed1 = _ed1;
+			ed2 = _ed2;
+			x = _x;
+			y = _y;
+			state = CROSSINGPOINT;
+		}
+
+		bool operator>(const EventPoint &ep) const {
+			return x > ep.x || (x == ep.x && y > ep.y); // lexicographical ordering
+		}
+	};
+
+	class EdgeDataCompare
+	{
+	public:
+		EdgeDataCompare() {}
+		inline bool operator()(const Arrangement::EdgeData *ed1, const Arrangement::EdgeData *ed2) const; // ed1 < ed2
+	};
+
+public:
+	typedef std::priority_queue<EventPoint, std::vector<EventPoint>, std::greater<EventPoint>> EventQueue;
+	typedef std::set<Arrangement::EdgeData *, EdgeDataCompare> EdgeDataBBT;
+	typedef std::set<Arrangement::EdgeData *, EdgeDataCompare>::iterator EdgeDataBBTIterator;
+
+private:
+	static Arrangement *parent;
+	static Arrangement *overlay;
+	static EventQueue events;
+	static EdgeDataBBT edgeDataBBT;
+	static int eventCount;
+
+	static bool handleIntersectionEvent(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2);
+	static std::pair<Arrangement::EdgeData *, Arrangement::EdgeData *> updateIntersectionDCEL(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2, double int_x, double int_y);
+
+public:
+	SweepLine() {}
+
+	static inline void initialize(Arrangement *_parent, Arrangement *_overlay);
+
+	static inline double getX() { return events.top().x; }
+
+	static void advance();
+	static inline void getOverlay()
+	{
+		while (!events.empty()) advance();
+	}
 };
 
 #endif // ARRANGEMENT_H

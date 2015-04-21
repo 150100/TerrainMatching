@@ -3,20 +3,22 @@
 #include "DCEL/DCELStream.h"
 
 TranslationSpaceSubdivision::TranslationSpaceSubdivision(Terrain *_t1, Terrain *_t2)
-    : t1(_t1), t2(_t2), Arrangement(_t1, _t2)
+    : t1(_t1), t2(_t2)
 {
     // initialize search data and CS
+	Arrangement arr_before_overlay(t1, t2);
+	arr_before_overlay.getOverlay(&arr);
     init();
 }
 
 void TranslationSpaceSubdivision::init()
 {
     // find a boundary halfedge incident to the unbounded face.
-    HalfEdge* he = NULL;
-    for (unsigned int i=0; i < number_of_halfedges(); ++i)
+	Arrangement::HalfEdge* he = NULL;
+    for (unsigned int i=0; i < arr.number_of_halfedges(); ++i)
     {
-        if (edges[i].getFace() == NULL) {
-            he = &edges[i];
+        if (arr.edges[i].getFace() == NULL) {
+            he = &arr.edges[i];
             break;
         }
     }
@@ -40,20 +42,20 @@ TranslationSpaceSubdivision::DFSState TranslationSpaceSubdivision::advance()
     if (m_he_stack.empty()) throw cpp::Exception("TSS stack should not be empty.");
 	
     // previous target
-    HalfEdge* cur_he = m_he_stack.top(); // enterence to the target face
-    Face* cur_f = cur_he->getTwin()->getFace(); // target face
+	Arrangement::HalfEdge* cur_he = m_he_stack.top(); // enterence to the target face
+	Arrangement::Face* cur_f = cur_he->getTwin()->getFace(); // target face
 
     // update the previous one
-    cur_f->getData().state = FaceData::PASSED;
+	cur_f->getData().state = Arrangement::FaceData::PASSED;
     m_he_stack.pop();
 
     // push adjacent faces to stack
-    EdgeIterator eit(cur_he->getTwin()->getFace());
+	Arrangement::EdgeIterator eit(cur_he->getTwin()->getFace());
     while (eit.hasNext())
     {
-        HalfEdge* next_he = eit.getNext();
-        Face* adj_f = next_he->getTwin()->getFace();
-        if (adj_f != NULL && adj_f->getData().state == FaceData::NOTPASSED)
+		Arrangement::HalfEdge* next_he = eit.getNext();
+		Arrangement::Face* adj_f = next_he->getTwin()->getFace();
+		if (adj_f != NULL && adj_f->getData().state == Arrangement::FaceData::NOTPASSED)
             m_he_stack.push(next_he);
     }
 
@@ -69,7 +71,7 @@ TranslationSpaceSubdivision::DFSState TranslationSpaceSubdivision::advance()
     while (cur_he->getFace() != m_he_path.top()->getTwin()->getFace())
     {
         // backtracking with CS updates
-        HalfEdge* back_he = m_he_path.top();
+		Arrangement::HalfEdge* back_he = m_he_path.top();
         update_CS(back_he->getTwin()); // backward
 
         m_he_path.pop();
@@ -94,15 +96,15 @@ bool TranslationSpaceSubdivision::solveLP(BasisResult &b)
     }
     // Execute LP-type problem solver only if the patch points are all on the valid domain.
     if (all_matched) {
-        HalfEdge* he = m_he_stack.top();
-        Face* f = he->getTwin()->getFace();
+		Arrangement::HalfEdge* he = m_he_stack.top();
+		Arrangement::Face* f = he->getTwin()->getFace();
         std::vector<Point> boundary_pts;
 
-        EdgeIterator eit(f);
+		Arrangement::EdgeIterator eit(f);
         while (eit.hasNext())
         {
-            HalfEdge* he = eit.getNext();
-            VertexData& vd = he->getOrigin()->getData();
+			Arrangement::HalfEdge* he = eit.getNext();
+			Arrangement::VertexData& vd = he->getOrigin()->getData();
             Point p(vd.x, vd.y, 0);
             boundary_pts.push_back(p);
         }
@@ -204,14 +206,14 @@ void TranslationSpaceSubdivision::switch_EEpairs(TerrainHalfEdge *he, TerrainVer
     }
 }
 
-void TranslationSpaceSubdivision::update_CS(HalfEdge *he)
+void TranslationSpaceSubdivision::update_CS(Arrangement::HalfEdge *he)
 {
-    EdgeData::SourceIterator sit;
+	Arrangement::EdgeData::SourceIterator sit;
 
     int multiple_edge_number = 0;
 
 	// for all the data of hh, update CS
-    std::vector<EdgeData::Source> &sources = he->getData().edgeData->sources;
+	std::vector<Arrangement::EdgeData::Source> &sources = he->getData().edgeData->sources;
 	for (sit = sources.begin(); sit != sources.end(); ++sit) {
 		// For vertex-triangle pairs...
 		switch_VTpair(sit->he, sit->v, sit->he_is_from_patch);

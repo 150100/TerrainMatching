@@ -10,11 +10,15 @@
 #include "terrain.h"
 
 
-class TranslationSpaceSubdivision : public Arrangement
+class TranslationSpaceSubdivision
 {
+	typedef Arrangement::TerrainHalfEdge TerrainHalfEdge;
+	typedef Arrangement::TerrainVertex TerrainVertex;
+	typedef Arrangement::TerrainFace TerrainFace;
+
     // members
-    std::stack<HalfEdge*> m_he_stack; // stack for DFS
-    std::stack<HalfEdge*> m_he_path; // path from the root
+	std::stack<Arrangement::HalfEdge*> m_he_stack; // stack for DFS
+	std::stack<Arrangement::HalfEdge*> m_he_path; // path from the root
     CombinatorialStructure m_CS;
     std::vector<bool *> m_checked_plist; // pointers to checked
 
@@ -29,14 +33,15 @@ class TranslationSpaceSubdivision : public Arrangement
     void switch_EEpairs(TerrainHalfEdge *he, TerrainVertex *v, bool he_is_from_patch);
 //    void remove_crossing_EEpairs(TerrainHalfEdge &he, TerrainVertex &v, bool he_is_from_patch);
 //    void insert_EEpairs_without_checked(TerrainHalfEdge &he, TerrainVertex &v, bool he_is_from_patch);
-    void update_CS(HalfEdge* he);
-    void update_CS(EdgeData::Source &ex_data);
+	void update_CS(Arrangement::HalfEdge* he);
+	void update_CS(Arrangement::EdgeData::Source &ex_data);
 
 public: 
     enum DFSState { DFS_ADVANCED, DFS_END, DFS_FAILED };
 
     TranslationSpaceSubdivision(Terrain *_t1, Terrain *_t2);
 
+	Arrangement arr; // arrangement
     Terrain *t1; // domain
     Terrain *t2; // patch
 

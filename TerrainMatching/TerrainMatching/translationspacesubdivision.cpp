@@ -6,8 +6,7 @@ TranslationSpaceSubdivision::TranslationSpaceSubdivision(Terrain *_t1, Terrain *
     : t1(_t1), t2(_t2)
 {
     // initialize search data and CS
-	Arrangement arr_before_overlay(t1, t2);
-	arr_before_overlay.getOverlay(&arr);
+	Arrangement arr(t1, t2);
     init();
 }
 

@@ -119,7 +119,6 @@ public:
 	typedef FaceT<VertexData, HalfEdgeData, FaceData> Face;
 	typedef EdgeIteratorT<VertexData, HalfEdgeData, FaceData> EdgeIterator;
 
-	Arrangement() {}
     Arrangement(Terrain *t1, Terrain *t2);
 
 	~Arrangement() {}
@@ -234,11 +233,6 @@ public:
 			erasedEdgeDataContainerIndices.push(id);
 	}
 
-	void getOverlay(Arrangement *overlay) {
-		sweepLine.initialize(this, overlay);
-		sweepLine.getOverlay();
-	}
-
 	std::vector<Vertex> vertices;
 	std::vector<HalfEdge> edges;
 	std::vector<Face> faces;
@@ -259,6 +253,7 @@ protected:
 
 // Sweep from left to right.
 // BBT is sorted downward.
+// Make sure that the parent arrangement has enough reserved space (at least order of nm^2).
 class SweepLine
 {
 private:
@@ -267,25 +262,14 @@ private:
 	public:
 		static enum EventState { VERTEXPOINT, CROSSINGPOINT };
 		Arrangement::Vertex *v;
-		Arrangement::EdgeData *ed1, *ed2;
 		double x, y;
 		EventState state;
 
-		EventPoint(Arrangement::Vertex *_v) { // vertex point
+		EventPoint(Arrangement::Vertex *_v, EventState _state) { // vertex point
 			v = _v;
-			ed1 = NULL;
-			ed2 = NULL;
 			x = v->getData().x;
 			y = v->getData().y;
-			state = VERTEXPOINT;
-		}
-		EventPoint(Arrangement::EdgeData *_ed1, Arrangement::EdgeData *_ed2, double _x, double _y) { // crossing point
-			x = NULL;
-			ed1 = _ed1;
-			ed2 = _ed2;
-			x = _x;
-			y = _y;
-			state = CROSSINGPOINT;
+			state = _state;
 		}
 
 		bool operator>(const EventPoint &ep) const {
@@ -307,23 +291,24 @@ public:
 
 private:
 	static Arrangement *parent;
-	static Arrangement *overlay;
 	static EventQueue events;
 	static EdgeDataBBT edgeDataBBT;
 	static int eventCount;
 
-	static bool handleIntersectionEvent(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2);
-	static std::pair<Arrangement::EdgeData *, Arrangement::EdgeData *> updateIntersectionDCEL(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2, double int_x, double int_y);
+	static bool handleProperIntersectionEvent(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2);
+	static Arrangement::Vertex * updateDCELProperIntersection(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2, double int_x, double int_y);
+	static void updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement::EdgeData *ed);
+	static void updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangement::Vertex *v_erase);
 
 public:
 	SweepLine() {}
 
-	static inline void initialize(Arrangement *_parent, Arrangement *_overlay);
+	static inline void initialize(Arrangement *_parent);
 
 	static inline double getX() { return events.top().x; }
 
 	static void advance();
-	static inline void getOverlay()
+	static inline void run()
 	{
 		while (!events.empty()) advance();
 	}

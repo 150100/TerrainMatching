@@ -66,6 +66,12 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 	unsigned int edges_first_idx = 0;
 	unsigned int faces_first_idx = 0;
 
+	// nm^2 estimation of the overlay size.
+	vertices.reserve(10 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
+	edges.reserve(80 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
+	faces.reserve(20 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
+	edgeDataContainer.reserve(40 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
+
 	// Insert all copied (t1) with translation of -(vertex of t2).
 	for (unsigned int i=0; i < vertices_t2.size(); ++i)
 	{
@@ -216,6 +222,10 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 	// Test edgeDataContainer.
 	if (edgeDataContainer.size() != number_of_halfedges() / 2)
 		throw cpp::Exception("# of Edges is not (# of Halfedges)/2.");
+
+	// Run sweepline algorithm.
+	sweepLine.initialize(this);
+	sweepLine.run();
 }
 
 
@@ -248,7 +258,7 @@ bool SweepLine::EdgeDataCompare::operator()(const Arrangement::EdgeData *ed1, co
 }
 
 // ed2 was below ed1. ed2 will go up, and ed1 will go down relatively.
-bool SweepLine::handleIntersectionEvent(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2)
+bool SweepLine::handleProperIntersectionEvent(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2)
 {
 	// check source
 	for (unsigned int i = 0; i < ed1->sources.size(); ++i) {
@@ -289,9 +299,10 @@ bool SweepLine::handleIntersectionEvent(Arrangement::EdgeData *ed1, Arrangement:
 	double min_y = vd1L.y > vd1R.y ? vd1R.y : vd1L.y;
 
 	// (x,y) in the segment range?
-	if ((det > 0 && vd1L.x * det <= x_det && x_det <= vd1R.x * det && min_y * det <= y_det && y_det <= max_y * det)
-	 || (det < 0 && vd1L.x * det >= x_det && x_det >= vd1R.x * det && min_y * det >= y_det && y_det >= max_y * det)) { // if two edges properly intersect, create new intersection event.
-		EventPoint ep(ed1, ed2, x_det / det, y_det / det);
+	if ((det > 0 && vd1L.x * det < x_det && x_det < vd1R.x * det && min_y * det < y_det && y_det < max_y * det)
+	 || (det < 0 && vd1L.x * det > x_det && x_det > vd1R.x * det && min_y * det > y_det && y_det > max_y * det)) { // if two edges properly intersect, create new intersection event.
+		Arrangement::Vertex *v = updateDCELProperIntersection(ed1, ed2, x_det / det, y_det / det);
+		EventPoint ep(v, EventPoint::VERTEXPOINT);
 		events.push(ep);
 		return true;
 	}
@@ -302,8 +313,8 @@ bool SweepLine::handleIntersectionEvent(Arrangement::EdgeData *ed1, Arrangement:
 
 // ed2 was below ed1. ed2 will go up, and ed1 will go down relatively.
 // returns (ed1N, ed2N)
-std::pair<Arrangement::EdgeData *, Arrangement::EdgeData *> 
-SweepLine::updateIntersectionDCEL(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2, double int_x, double int_y)
+Arrangement::Vertex * 
+SweepLine::updateDCELProperIntersection(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2, double int_x, double int_y)
 {
 	/*
 			he1u		 [f1u]		    he2Nu
@@ -320,26 +331,20 @@ SweepLine::updateIntersectionDCEL(Arrangement::EdgeData *ed1, Arrangement::EdgeD
 	Arrangement::HalfEdge *he2u = ed2->halfEdge_up;
 	Arrangement::HalfEdge *he2d = ed2->halfEdge_down;
 
-	// lazy handling of intersections before related to faces
-	he1u->setFace(he1u->getPrev()->getFace());
-	he1d->setFace(he1d->getNext()->getFace());
-	he2u->setFace(he2u->getPrev()->getFace());
-	he2d->setFace(he2d->getNext()->getFace());
-
 	// create a new intersection vertex
-	Arrangement::Vertex *v_int = overlay->createVertex();
+	Arrangement::Vertex *v_int = parent->createVertex();
 	v_int->getData().x = int_x;
 	v_int->getData().y = int_y;
 
 	// create four halfedges for ed1 and ed2 after v
-	Arrangement::HalfEdge *he1Nu = overlay->createHalfEdge();
-	Arrangement::HalfEdge *he1Nd = overlay->createHalfEdge();
-	Arrangement::HalfEdge *he2Nu = overlay->createHalfEdge();
-	Arrangement::HalfEdge *he2Nd = overlay->createHalfEdge();
+	Arrangement::HalfEdge *he1Nu = parent->createHalfEdge();
+	Arrangement::HalfEdge *he1Nd = parent->createHalfEdge();
+	Arrangement::HalfEdge *he2Nu = parent->createHalfEdge();
+	Arrangement::HalfEdge *he2Nd = parent->createHalfEdge();
 
 	// create two edgedata for ed1 and ed2 after v
-	Arrangement::EdgeData *ed1N = overlay->createEdgeData();
-	Arrangement::EdgeData *ed2N = overlay->createEdgeData();
+	Arrangement::EdgeData *ed1N = parent->createEdgeData();
+	Arrangement::EdgeData *ed2N = parent->createEdgeData();
 	ed1N->sources = ed1->sources;
 	ed1N->halfEdge_up = he1Nu;
 	ed1N->halfEdge_down = he1Nd;
@@ -387,13 +392,116 @@ SweepLine::updateIntersectionDCEL(Arrangement::EdgeData *ed1, Arrangement::EdgeD
 	// face will be handled later
 
 	// returns (ed1N, ed2N)
-	return std::pair<Arrangement::EdgeData *, Arrangement::EdgeData *>(ed1N, ed2N);
+	return v_int;
 }
 
-void SweepLine::initialize(Arrangement *_parent, Arrangement *_overlay)
+void SweepLine::updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement::EdgeData *ed)
+{
+	/*
+			  v_dummy			   v¦¢				 edu  v¦¢  edNu
+		(ed)-----¡Ü-----(edN)	+	¡Ü	  =		(ed)-------¡Ü-------(edN)
+									¦¢				 edNd  ¦¢  edd
+	*/
+
+	// existing structure of ed
+	Arrangement::HalfEdge *edu = ed->halfEdge_up;
+	Arrangement::HalfEdge *edd = ed->halfEdge_down;
+
+	// create new structure
+	Arrangement::EdgeData *edN = parent->createEdgeData();
+	Arrangement::HalfEdge *edNu = parent->createHalfEdge();
+	Arrangement::HalfEdge *edNd = parent->createHalfEdge();
+	Arrangement::Vertex *v_dummy = parent->createVertex();
+	v_dummy->getData() = v->getData(); // copy constructor
+
+	// link edges, halfedges, v_dummy
+	edN->halfEdge_up = edNu;
+	edN->halfEdge_down = edd;
+	ed->halfEdge_down = edNd;
+	edNu->setNext(edu->getNext());
+	edNu->setOrigin(v_dummy);
+	edNu->setPrev(edu);
+	edNu->setTwin(edd);
+	edNd->setNext(edd->getNext());
+	edNd->setOrigin(v_dummy);
+	edNd->setPrev(edd);
+	edNd->setTwin(edu);
+
+	// merge v_dummy to v
+	updateDCEL2VertexIntersection(v, v_dummy);
+}
+
+void SweepLine::updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangement::Vertex *v_del)
+{
+	Vector2<double> vec_v(v->getData());
+	Vector2<double> vec_v_del(v_del->getData());
+
+	// check the same point
+	if (!(v->getData() == v_del->getData())) throw cpp::Exception("v and v_del are not the same point.");
+	
+	// merge incident edges of v_del into v
+	/*
+		¦£------- he_prev (from v)
+		¦¢
+		¦§------- he (from v_del)
+		¦¢
+		¦¦------- he_next (from v)
+	*/
+
+	// initialize edges from v
+	Arrangement::EdgeIterator eit(v);
+	Arrangement::HalfEdge *he_prev = eit.getNext();
+	Vector2<double> vec_he_prev = Vector2<double>(he_prev->getTwin()->getOrigin()->getData()) - vec_v;
+	Arrangement::HalfEdge *he_next = eit.getNext();
+	Vector2<double> vec_he_next = Vector2<double>(he_next->getTwin()->getOrigin()->getData()) - vec_v;
+
+	// traverse incident edges of v_del and attach them to v
+	Arrangement::EdgeIterator eit_del(v_del);
+	while (eit_del.hasNext()) {
+		Arrangement::HalfEdge *he = eit_del.getNext();
+		Vector2<double> vec_he = Vector2<double>(he->getTwin()->getOrigin()->getData()) - vec_v_del;
+
+		// traverse incident edges of v while he becomes between he_prev and he_next.
+		bool inserted = false;
+		while (!inserted) {
+			if (vec_he_prev * vec_he_next < 0) { // reflex angle
+				if (!vec_he.isLeftFrom(vec_he_prev) || vec_he.isLeftFrom(vec_he_next)) { // if he is in prev~next
+					// link edges of v_del to v
+					he_prev->getTwin()->setNext(he);
+					he_next->setPrev(he);
+					inserted = true;
+				}
+			}
+			else { // not reflex angle
+				if (!vec_he.isLeftFrom(vec_he_prev) && vec_he.isLeftFrom(vec_he_next)) { // if he is in prev~next
+					// link edges of v_del to v
+					he_prev->getTwin()->setNext(he);
+					he_next->setPrev(he);
+					inserted = true;
+				}
+			}
+			// get next one
+			if (!inserted) {
+				if (!eit.hasNext()) eit.reset();
+				he_prev = he_next;
+				vec_he_prev = vec_he_next;
+				he_next = eit.getNext();
+				vec_he_next = Vector2<double>(he_next->getTwin()->getOrigin()->getData()) - vec_v;
+			}
+		}
+
+		// attach he to v
+		he->setOrigin(v);
+	}
+
+	// erase v_del (lazy)
+	unsigned int id = v_del - &(parent->vertices[0]);
+	parent->deleteVertex(id);
+}
+
+void SweepLine::initialize(Arrangement *_parent)
 {
 	parent = _parent;
-	overlay = _overlay;
 
 	// Initialize event queue
 	events = EventQueue();
@@ -402,7 +510,7 @@ void SweepLine::initialize(Arrangement *_parent, Arrangement *_overlay)
 	for (unsigned int i = 0; i < parent->vertices.size(); ++i)
 	{
 		Arrangement::Vertex *v = &parent->vertices.at(i);
-		events.push(EventPoint(v));
+		events.push(EventPoint(v, EventPoint::VERTEXPOINT));
 	}
 }
 
@@ -447,7 +555,7 @@ void SweepLine::advance()
 			if (bbt_entry != edgeDataBBT.end() || bbt_entry != edgeDataBBT.begin()) { // if erased edge is not the highest of lowest, check intersection event.
 				Arrangement::EdgeData *ed1 = *bbt_entry;
 				Arrangement::EdgeData *ed2 = *--bbt_entry;
-				handleIntersectionEvent(ed1, ed2);
+				handleProperIntersectionEvent(ed1, ed2);
 			}
 		}
 
@@ -458,17 +566,17 @@ void SweepLine::advance()
 
 			EdgeDataBBTIterator hintit_next = edgeDataBBT.insert(hintit, he->getData().edgeData);
 			if (hintit_next == hintit) { // if there is already an edge of the same slope (so cannot be inserted), make it twin-edge. -----¡Ü======¡Ü-----
-				
+
 			}
 			else { // else, check intersections with neighbors of BBT
 				EdgeDataBBTIterator it = hintit_next;
 				if (it != edgeDataBBT.begin()) { // if it is not the lowest, check intersection with the lower neighbor.
 					EdgeDataBBTIterator it_low = it;
-					handleIntersectionEvent(*--it_low, *it);
+					handleProperIntersectionEvent(*--it_low, *it);
 				}
 				if (it != --edgeDataBBT.end()) { // if it is not the highest, check intersection with the higher neighbor.
 					EdgeDataBBTIterator it_high = it;
-					handleIntersectionEvent(*++it_high, *it);
+					handleProperIntersectionEvent(*++it_high, *it);
 				}
 				hintit = hintit_next; // update hint.
 			}
@@ -476,7 +584,8 @@ void SweepLine::advance()
 	}
 	else if (ep.state == EventPoint::CROSSINGPOINT)
 	{
-		// Update edge links and insert two new edges
+		// Swap contents of BBT
+		ep.v
 	}
 	else
 	{

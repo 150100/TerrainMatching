@@ -3,10 +3,9 @@
 #include "DCEL/DCELStream.h"
 
 TranslationSpaceSubdivision::TranslationSpaceSubdivision(Terrain *_t1, Terrain *_t2)
-    : t1(_t1), t2(_t2)
+	: t1(_t1), t2(_t2), arr(_t1, _t2)
 {
     // initialize search data and CS
-	Arrangement arr(t1, t2);
     init();
 }
 

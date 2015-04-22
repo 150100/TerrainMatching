@@ -94,7 +94,7 @@ public:
 };
 
 ///
-
+class SweepLine;
 // TO DO : This should be singleton.
 class Arrangement
 {
@@ -243,9 +243,6 @@ protected:
 	std::queue<unsigned int> erasedEdgesIndices;
 	std::queue<unsigned int> erasedFacesIndices;
 	std::queue<unsigned int> erasedEdgeDataContainerIndices;
-	
-private:
-	static void eraseZeroLengthEdge(EdgeData *ed);
 
 protected:
 	static SweepLine sweepLine;
@@ -260,16 +257,13 @@ private:
 	class EventPoint
 	{
 	public:
-		static enum EventState { VERTEXPOINT, CROSSINGPOINT };
 		Arrangement::Vertex *v;
 		double x, y;
-		EventState state;
 
-		EventPoint(Arrangement::Vertex *_v, EventState _state) { // vertex point
+		EventPoint(Arrangement::Vertex *_v) {
 			v = _v;
 			x = v->getData().x;
 			y = v->getData().y;
-			state = _state;
 		}
 
 		bool operator>(const EventPoint &ep) const {

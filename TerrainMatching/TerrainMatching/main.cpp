@@ -112,9 +112,9 @@ int main(int argc, char **argv)
         TranslationSpaceSubdivision tss(&T, &P); // with construction
 
         std::cerr << "Translation Space Subdivision information" << std::endl;
-        std::cerr << "V = " << tss.number_of_vertices() << std::endl;
-        std::cerr << "E = " << tss.number_of_edges() << std::endl;
-        std::cerr << "F = " << tss.number_of_faces() << std::endl;
+        std::cerr << "V = " << tss.arr.number_of_vertices() << std::endl;
+		std::cerr << "E = " << tss.arr.number_of_edges() << std::endl;
+		std::cerr << "F = " << tss.arr.number_of_faces() << std::endl;
 
 
 

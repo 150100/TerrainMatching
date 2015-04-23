@@ -34,7 +34,7 @@ public:
 	}
 	// true if *this is left from v, false otherwise.
 	inline bool isLeftFrom(const Vector2<T> &v) const {
-		return det(v) > 0;
+		return det(v) < 0;
 	}
 };
 
@@ -85,9 +85,7 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 			TerrainVertex &v_t1 = vertices_t1.at(j);
 			v.getData().x = v_t1.getData().p.x - v_t2.getData().p.x;
 			v.getData().y = v_t1.getData().p.y - v_t2.getData().p.y;
-
-			if (v_t1.getIncidentEdge() == NULL) v.setIncidentEdge(NULL);
-			else v.setIncidentEdge(&edges[0] + edges_first_idx
+			v.setIncidentEdge(&edges[0] + edges_first_idx
 				+ mesh_t1.getHalfEdgeId(v_t1.getIncidentEdge()));
 		}
 		// copy edge info
@@ -96,9 +94,9 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 			HalfEdge &he = edges.at(edges_first_idx + j);
 			TerrainHalfEdge &he_t1 = edges_t1.at(j);
 
-			if (he_t1.getFace() == NULL) he.setFace(NULL);
-			else he.setFace(&faces[0] + faces_first_idx 
-				+ mesh_t1.getFaceId(he_t1.getFace()));
+			//if (he_t1.getFace() == NULL) he.setFace(NULL);
+			//else he.setFace(&faces[0] + faces_first_idx 
+			//	+ mesh_t1.getFaceId(he_t1.getFace()));
 
 			he.setNext(&edges[0] + edges_first_idx
 				+ mesh_t1.getHalfEdgeId(he_t1.getNext()));
@@ -155,10 +153,8 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 			TerrainVertex &v_t2 = vertices_t2.at(j);
 			v.getData().x = v_t1.getData().p.x - v_t2.getData().p.x;
 			v.getData().y = v_t1.getData().p.y - v_t2.getData().p.y;
-
-			if (v_t2.getIncidentEdge() == NULL) v.setIncidentEdge(NULL);
-			else v.setIncidentEdge(&edges[0] + edges_first_idx
-				+ mesh_t1.getHalfEdgeId(v_t2.getIncidentEdge()));
+			v.setIncidentEdge(&edges[0] + edges_first_idx
+				+ mesh_t2.getHalfEdgeId(v_t2.getIncidentEdge()));
 		}
 		// copy edge info
 		for (unsigned int j=0; j < edges_t2.size(); ++j)
@@ -166,9 +162,9 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 			HalfEdge &he = edges[edges_first_idx + j];
 			TerrainHalfEdge &he_t2 = edges_t2.at(j);
 
-			if (he_t2.getFace() == NULL) he.setFace(NULL);
-			else he.setFace(&faces[0] + faces_first_idx 
-				+ mesh_t2.getFaceId(he_t2.getFace()));
+			//if (he_t2.getFace() == NULL) he.setFace(NULL);
+			//else he.setFace(&faces[0] + faces_first_idx 
+			//	+ mesh_t2.getFaceId(he_t2.getFace()));
 
 			he.setNext(&edges[0] + edges_first_idx 
 				+ mesh_t2.getHalfEdgeId(he_t2.getNext()));
@@ -243,18 +239,18 @@ bool SweepLine::EdgeDataCompare::operator()(const Arrangement::EdgeData *ed1, co
 	// (vd1R.y - vd1L.y) * (sx - vd1L.x) / (vd1R.x - vd1L.x) = y1 < y2 = (vd2R.y - vd2L.y) * (sx - vd2L.x) / (vd2R.x - vd2L.x);
 	double comp_y = (vd1R.y - vd1L.y) * (sx - vd1L.x) * (vd2R.x - vd2L.x) - (vd2R.y - vd2L.y) * (sx - vd2L.x) * (vd1R.x - vd1L.x);
 
-	if (comp_y == 0) {
-		// Compare slope
-		// (vd1R.y - vd1L.y) / (vd1R.x - vd1L.x) = s1 < s2 = (vd2R.y - vd2L.y) / (vd2R.x - vd2L.x)
-		double comp_s = (vd1R.y - vd1L.y) * (vd2R.x - vd2L.x) - (vd2R.y - vd2L.y) * (vd1R.x - vd1L.x);
+	//if (comp_y == 0) {
+	//	// Compare slope
+	//	// (vd1R.y - vd1L.y) / (vd1R.x - vd1L.x) = s1 < s2 = (vd2R.y - vd2L.y) / (vd2R.x - vd2L.x)
+	//	double comp_s = (vd1R.y - vd1L.y) * (vd2R.x - vd2L.x) - (vd2R.y - vd2L.y) * (vd1R.x - vd1L.x);
 
-		//if (comp_s == 0) {
-		//	return ed1 < ed2; // not comparable. just distinguish.
-		//}
-		//else
-			return comp_s < 0;
-	}
-	else
+	//	//if (comp_s == 0) {
+	//	//	return ed1 < ed2; // not comparable. just distinguish.
+	//	//}
+	//	//else
+	//		return comp_s < 0;
+	//}
+	//else
 		return comp_y < 0;
 }
 
@@ -426,6 +422,7 @@ void SweepLine::updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrange
 	edNd->setOrigin(v_dummy);
 	edNd->setPrev(edd);
 	edNd->setTwin(edu);
+	v_dummy->setIncidentEdge(edNu);
 
 	// merge v_dummy to v
 	updateDCEL2VertexIntersection(v, v_dummy);
@@ -455,48 +452,67 @@ void SweepLine::updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangemen
 	Arrangement::HalfEdge *he_next = eit.getNext();
 	Vector2<double> vec_he_next = Vector2<double>(he_next->getTwin()->getOrigin()->getData()) - vec_v;
 
-	// traverse incident edges of v_del and attach them to v
+	// copy incident edges of v_del
+	std::vector<Arrangement::HalfEdge *> incidentEdges_v_del;
 	Arrangement::EdgeIterator eit_del(v_del);
 	while (eit_del.hasNext()) {
 		Arrangement::HalfEdge *he = eit_del.getNext();
+		incidentEdges_v_del.push_back(he);
+	}
+
+	// traverse incident edges of v_del and attach them to v
+	for (unsigned int i = 0; i < incidentEdges_v_del.size(); ++i) {
+		Arrangement::HalfEdge *he = incidentEdges_v_del[i];
 		Vector2<double> vec_he = Vector2<double>(he->getTwin()->getOrigin()->getData()) - vec_v_del;
 
 		// traverse incident edges of v while he becomes between he_prev and he_next.
 		bool inserted = false;
 		while (!inserted) {
-			if (vec_he_prev * vec_he_next < 0) { // reflex angle
-				if (!vec_he.isLeftFrom(vec_he_prev) || vec_he.isLeftFrom(vec_he_next)) { // if he is in prev~next
-					// link edges of v_del to v
-					he_prev->getTwin()->setNext(he);
-					he_next->setPrev(he);
-					inserted = true;
-				}
-			}
-			else { // not reflex angle
+			if (vec_he_prev.isLeftFrom(vec_he_next)) { // not reflex angle
 				if (!vec_he.isLeftFrom(vec_he_prev) && vec_he.isLeftFrom(vec_he_next)) { // if he is in prev~next
-					// link edges of v_del to v
-					he_prev->getTwin()->setNext(he);
-					he_next->setPrev(he);
+					// link he to v
+					he->setPrev(he_prev->getTwin());
+					he->getTwin()->setNext(he_next);
+					he->setOrigin(v);
 					inserted = true;
 				}
 			}
-			// get next one
-			if (!inserted) {
+			else { // reflex angle
+				if (!vec_he.isLeftFrom(vec_he_prev) || vec_he.isLeftFrom(vec_he_next)) { // if he is in prev~next
+					// link he to v
+					he->setPrev(he_prev->getTwin());
+					he->getTwin()->setNext(he_next);
+					he->setOrigin(v);
+					inserted = true;
+				}
+			}
+			
+			if (!inserted) { // if not inserted, get next range of incident edges of v
 				if (!eit.hasNext()) eit.reset();
 				he_prev = he_next;
 				vec_he_prev = vec_he_next;
 				he_next = eit.getNext();
 				vec_he_next = Vector2<double>(he_next->getTwin()->getOrigin()->getData()) - vec_v;
 			}
+			else { // if inserted, set inserted edge as the "prev"
+				he_prev = he;
+				vec_he_prev = vec_he;
+			}
 		}
-
-		// attach he to v
-		he->setOrigin(v);
 	}
 
 	// erase v_del (lazy)
 	unsigned int id = v_del - &(parent->vertices[0]);
 	parent->deleteVertex(id);
+
+	Arrangement::EdgeIterator eit_debug(v);
+	while (eit_debug.hasNext()) {
+		Arrangement::HalfEdge *he = eit_debug.getNext();
+		std::cerr << " - ";
+		he->getData().edgeData->print();
+		std::cerr << '\n';
+	}
+	std::cerr << '\n';
 }
 
 void SweepLine::initialize(Arrangement *_parent)
@@ -579,6 +595,7 @@ void SweepLine::advance()
 			EdgeDataBBTIterator hintit_next = edgeDataBBT.insert(hintit, he->getData().edgeData);
 			if (*hintit_next != he->getData().edgeData) { // if there is already an edge of the same slope (so cannot be inserted), make it twin-edge. -----¡Ü======¡Ü-----
 				updateDCELVertexEdgeIntersection(ep.v, *hintit_next);
+				updateDCELVertexEdgeIntersection((*hintit_next)->halfEdge_down->getOrigin(), he->getData().edgeData);
 			}
 			else { // else, check intersections with neighbors of BBT
 				EdgeDataBBTIterator it = hintit_next;

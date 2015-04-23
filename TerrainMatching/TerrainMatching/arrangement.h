@@ -280,8 +280,8 @@ private:
 
 public:
 	typedef std::priority_queue<EventPoint, std::vector<EventPoint>, std::greater<EventPoint>> EventQueue;
-	typedef std::multiset<Arrangement::EdgeData *, EdgeDataCompare> EdgeDataBBT;
-	typedef std::multiset<Arrangement::EdgeData *, EdgeDataCompare>::iterator EdgeDataBBTIterator;
+	typedef std::set<Arrangement::EdgeData *, EdgeDataCompare> EdgeDataBBT;
+	typedef std::set<Arrangement::EdgeData *, EdgeDataCompare>::iterator EdgeDataBBTIterator;
 
 private:
 	static Arrangement *parent;

@@ -6,6 +6,7 @@ SweepLine Arrangement::sweepLine;
 
 Arrangement *SweepLine::parent = NULL;
 SweepLine::EventQueue SweepLine::events;
+SweepLine::EventPoint *SweepLine::currentEvent = NULL;
 SweepLine::EdgeDataBBT SweepLine::edgeDataBBT;
 int SweepLine::eventCount = 0;
 
@@ -18,7 +19,7 @@ private:
 public:
 	Vector2() {}
 	Vector2(double _x, double _y) : x(_x), y(_y) {}
-	Vector2(ArrangementVertexData &vd) : x(vd.x), y(vd.y) {}
+	Vector2(const ArrangementVertexData &vd) : x(vd.x), y(vd.y) {}
 
 	// get a vector from v to *this
 	inline Vector2<T> operator-(const Vector2<T> &v) const { 
@@ -236,40 +237,46 @@ bool SweepLine::EdgeDataCompare::operator()(const Arrangement::EdgeData *ed1, co
 	double sx = getX();
 	
 	// Compare y-coordinate of the intersection with the sweepLine.
-	// (vd1R.y - vd1L.y) * (sx - vd1L.x) / (vd1R.x - vd1L.x) = y1 < y2 = (vd2R.y - vd2L.y) * (sx - vd2L.x) / (vd2R.x - vd2L.x);
-	double comp_y = (vd1R.y - vd1L.y) * (sx - vd1L.x) * (vd2R.x - vd2L.x) - (vd2R.y - vd2L.y) * (sx - vd2L.x) * (vd1R.x - vd1L.x);
+	// (vd1R.y - vd1L.y) * (sx - vd1L.x) / (vd1R.x - vd1L.x) + vd1L.y = y1 > y2 = (vd2R.y - vd2L.y) * (sx - vd2L.x) / (vd2R.x - vd2L.x) + vd2L.y;
+	double comp_y = ((vd1R.y - vd1L.y) * (sx - vd1L.x) * (vd2R.x - vd2L.x) + vd1L.y * (vd1R.x - vd1L.x) * (vd2R.x - vd2L.x))
+				  - ((vd2R.y - vd2L.y) * (sx - vd2L.x) * (vd1R.x - vd1L.x) + vd2L.y * (vd1R.x - vd1L.x) * (vd2R.x - vd2L.x));
 
 	//if (comp_y == 0) {
 	//	// Compare slope
-	//	// (vd1R.y - vd1L.y) / (vd1R.x - vd1L.x) = s1 < s2 = (vd2R.y - vd2L.y) / (vd2R.x - vd2L.x)
+	//	// (vd1R.y - vd1L.y) / (vd1R.x - vd1L.x) = s1 > s2 = (vd2R.y - vd2L.y) / (vd2R.x - vd2L.x)
 	//	double comp_s = (vd1R.y - vd1L.y) * (vd2R.x - vd2L.x) - (vd2R.y - vd2L.y) * (vd1R.x - vd1L.x);
 
 	//	//if (comp_s == 0) {
-	//	//	return ed1 < ed2; // not comparable. just distinguish.
+	//	//	return ed1 > ed2; // not comparable. just distinguish.
 	//	//}
 	//	//else
-	//		return comp_s < 0;
+	//		return comp_s > 0;
 	//}
 	//else
-		return comp_y < 0;
+		return comp_y > 0;
 }
 
 // ed2 was below ed1. ed2 will go up, and ed1 will go down relatively.
 bool SweepLine::handleProperIntersectionEvent(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2)
 {
-	// check source
-	for (unsigned int i = 0; i < ed1->sources.size(); ++i) {
-		for (unsigned int j = 0; j < ed2->sources.size(); ++j) {
-			if (ed1->sources[i] == ed2->sources[j]) { // if the edges are from the same source, don't handle intersection event (already proved not to be intersect).
-				return false;
-			}
-		}
-	}
+	//// check source
+	//for (unsigned int i = 0; i < ed1->sources.size(); ++i) {
+	//	for (unsigned int j = 0; j < ed2->sources.size(); ++j) {
+	//		if (ed1->sources[i] == ed2->sources[j]) { // if the edges are from the same source, don't handle intersection event (already proved not to be intersect).
+	//			return false;
+	//		}
+	//	}
+	//}
 
 	Arrangement::VertexData &vd1L = ed1->halfEdge_up->getOrigin()->getData();
 	Arrangement::VertexData &vd1R = ed1->halfEdge_down->getOrigin()->getData();
 	Arrangement::VertexData &vd2L = ed2->halfEdge_up->getOrigin()->getData();
 	Arrangement::VertexData &vd2R = ed2->halfEdge_down->getOrigin()->getData();
+
+	// filter boundary-intersecting set
+	if (vd1L == vd2L || vd1R == vd2R) {
+		return false;
+	}
 
 	// Ax + By = C
 	double A_1 = vd1R.y - vd1L.y;
@@ -536,6 +543,7 @@ void SweepLine::advance()
 	EventPoint ep = events.top();
 	events.pop();
 	++eventCount;
+	currentEvent = &ep;
 
 	while (events.top().x == ep.x && events.top().y == ep.y) { // while two event points have the same position, merge the point to ep.
 		EventPoint ep_next = events.top();
@@ -547,26 +555,36 @@ void SweepLine::advance()
 	Arrangement::EdgeIterator eit(ep.v);
 
 	// Find the first before-event edge and the first after-event edge.
+	Vector2<double> vec_v(ep.v->getData());
 	Arrangement::HalfEdge *BEedge(NULL), *AEedge(NULL);
-	bool he_was_before_event = false;
-	bool he_was_after_event = false;
+	Vector2<double> vec_edge_before_event, vec_edge_after_event;
 	while (eit.hasNext()) {
 		Arrangement::HalfEdge *he = eit.getNext();
+		const Arrangement::VertexData &vd = he->getTwin()->getOrigin()->getData();
+		Vector2<double> vec_edge = Vector2<double>(vd) - vec_v;
 
-		// get flag values
-		bool he_is_before_event = he->getTwin()->getOrigin()->getData() < ep.v->getData();
-		bool he_is_after_event = !he_is_before_event;
-		if (!he_was_before_event && he_is_before_event) { // if he is the first before-event edge, set it to the first edge of eit.
-			BEedge = he;
+		if (vd < ep.v->getData()) { // if he is the first before-event edge, set it to the first edge of before-edges.
+			if (BEedge == NULL || vec_edge.isLeftFrom(vec_edge_before_event)) {
+				BEedge = he;
+				vec_edge_before_event = vec_edge;
+			}
 		}
-		else if (!he_was_after_event && he_is_after_event) { // if he is the first after-event edge, check it.
-			AEedge = he;
+		else { // if he is the first after-event edge, set it to the first edge of after-edges.
+			if (AEedge == NULL || vec_edge.isLeftFrom(vec_edge_after_event)) {
+				AEedge = he;
+				vec_edge_after_event = vec_edge;
+			}
 		}
-
-		// update before(after)-event flags.
-		he_was_before_event = he_is_before_event; 
-		he_was_after_event = he_is_after_event;
 	}
+
+	EdgeDataBBTIterator it_debug = edgeDataBBT.begin();
+	while (it_debug != edgeDataBBT.end()) {
+		std::cerr << *it_debug << " = ";
+		(*it_debug)->print();
+		std::cerr << '\n';
+		++it_debug;
+	}
+	std::cerr << '\n';
 
 	// Erase mode. ¢Ä
 	if (BEedge != NULL) {
@@ -576,7 +594,7 @@ void SweepLine::advance()
 		do { // erase only when he does not reach to AEedge or BEedge yet.
 			EdgeDataBBTIterator bbt_entry = edgeDataBBT.find(he->getData().edgeData);
 			bbt_entry = edgeDataBBT.erase(bbt_entry);
-			if (bbt_entry != edgeDataBBT.end() || bbt_entry != edgeDataBBT.begin()) { // if erased edge is not the highest of lowest, check intersection event.
+			if (bbt_entry != edgeDataBBT.end() && bbt_entry != edgeDataBBT.begin()) { // if erased edge is not the highest of lowest, check intersection event.
 				Arrangement::EdgeData *ed1 = *bbt_entry;
 				Arrangement::EdgeData *ed2 = *--bbt_entry;
 				handleProperIntersectionEvent(ed1, ed2);
@@ -584,6 +602,15 @@ void SweepLine::advance()
 			he = BEeit.getNext(); // next step
 		} while (he != AEedge && he != BEedge);
 	}
+
+	it_debug = edgeDataBBT.begin();
+	while (it_debug != edgeDataBBT.end()) {
+		std::cerr << *it_debug << " = ";
+		(*it_debug)->print();
+		std::cerr << '\n';
+		++it_debug;
+	}
+	std::cerr << '\n';
 
 	// Insert mode. ¢Å
 	if (AEedge != NULL) {
@@ -607,17 +634,18 @@ void SweepLine::advance()
 					EdgeDataBBTIterator it_high = it;
 					handleProperIntersectionEvent(*++it_high, *it);
 				}
-				hintit = hintit_next; // update hint.
+				hintit = ++hintit_next; // update hint.
 			}
 			he = AEeit.getNext(); // next step.
 		} while (he != BEedge && he != AEedge);
 	}
 
-	EdgeDataBBTIterator it_debug = edgeDataBBT.begin();
+	it_debug = edgeDataBBT.begin();
 	while (it_debug != edgeDataBBT.end()) {
-		std::cerr << " = ";
+		std::cerr << *it_debug <<  " = ";
 		(*it_debug)->print();
 		std::cerr << '\n';
 		++it_debug;
 	}
+	std::cerr << '\n';
 }

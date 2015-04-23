@@ -275,17 +275,18 @@ private:
 	{
 	public:
 		EdgeDataCompare() {}
-		inline bool operator()(const Arrangement::EdgeData *ed1, const Arrangement::EdgeData *ed2) const; // ed1 < ed2
+		inline bool operator()(const Arrangement::EdgeData *ed1, const Arrangement::EdgeData *ed2) const; // ed1 > ed2
 	};
 
 public:
 	typedef std::priority_queue<EventPoint, std::vector<EventPoint>, std::greater<EventPoint>> EventQueue;
-	typedef std::set<Arrangement::EdgeData *, EdgeDataCompare> EdgeDataBBT;
-	typedef std::set<Arrangement::EdgeData *, EdgeDataCompare>::iterator EdgeDataBBTIterator;
+	typedef std::multiset<Arrangement::EdgeData *, EdgeDataCompare> EdgeDataBBT;
+	typedef std::multiset<Arrangement::EdgeData *, EdgeDataCompare>::iterator EdgeDataBBTIterator;
 
 private:
 	static Arrangement *parent;
 	static EventQueue events;
+	static EventPoint *currentEvent;
 	static EdgeDataBBT edgeDataBBT;
 	static int eventCount;
 
@@ -299,7 +300,7 @@ public:
 
 	static inline void initialize(Arrangement *_parent);
 
-	static inline double getX() { return events.top().x; }
+	static inline double getX() { return currentEvent->x; }
 
 	static void advance();
 	static inline void run()

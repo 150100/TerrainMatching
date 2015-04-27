@@ -280,8 +280,8 @@ private:
 
 public:
 	typedef std::priority_queue<EventPoint, std::vector<EventPoint>, std::greater<EventPoint>> EventQueue;
-	typedef std::set<Arrangement::EdgeData *, EdgeDataCompare> EdgeDataBBT;
-	typedef std::set<Arrangement::EdgeData *, EdgeDataCompare>::iterator EdgeDataBBTIterator;
+	typedef std::multiset<Arrangement::EdgeData *, EdgeDataCompare> EdgeDataBBT;
+	typedef std::multiset<Arrangement::EdgeData *, EdgeDataCompare>::iterator EdgeDataBBTIterator;
 
 private:
 	static Arrangement *parent;
@@ -292,7 +292,7 @@ private:
 
 	static bool handleProperIntersectionEvent(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2);
 	static Arrangement::Vertex * updateDCELProperIntersection(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2, double int_x, double int_y);
-	static void updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement::EdgeData *ed);
+	static Arrangement::EdgeData * updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement::EdgeData *ed);
 	static void updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangement::Vertex *v_erase);
 
 public:

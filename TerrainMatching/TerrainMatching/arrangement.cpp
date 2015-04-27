@@ -227,7 +227,7 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 }
 
 
-bool SweepLine::EdgeDataCompare::operator()(const Arrangement::EdgeData *ed1, const Arrangement::EdgeData *ed2) const // return ed1 < ed2
+bool SweepLine::EdgeDataCompare::operator()(const Arrangement::EdgeData *ed1, const Arrangement::EdgeData *ed2) const // return ed1 > ed2
 {
 	Arrangement::VertexData &vd1L = ed1->halfEdge_up->getOrigin()->getData();
 	Arrangement::VertexData &vd1R = ed1->halfEdge_down->getOrigin()->getData();

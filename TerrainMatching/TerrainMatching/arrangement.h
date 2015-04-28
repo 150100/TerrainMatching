@@ -206,6 +206,16 @@ public:
 
 	inline void deleteVertex(unsigned int id)
 	{
+#ifdef _DEBUG
+		EdgeIterator eit(&vertices[id]);
+		while (eit.hasNext()) {
+			HalfEdge *he = eit.getNext();
+			if (he->getOrigin() == &vertices[id]) {
+				he->setOrigin(NULL);
+				std::cerr << "WARNING : unsafe vertex deletion. Please unconnect nearby halfEdges first.\n";
+			}
+		}
+#endif
 		if (id >= vertices.size())
 			throw cpp::Exception("Delete vertices-index exceeds the size.");
 		else
@@ -213,6 +223,20 @@ public:
 	}
 	inline void deleteHalfEdge(unsigned int id)
 	{
+#ifdef _DEBUG
+		if (edges[id].getNext()->getPrev() == &edges[id]) {
+			edges[id].getNext()->setPrev(NULL);
+			std::cerr << "WARNING : unsafe halfEdge deletion. Please unconnect nearby halfEdges first.1\n";
+		}
+		if (edges[id].getPrev()->getNext() == &edges[id]) {
+			edges[id].getPrev()->setNext(NULL);
+			std::cerr << "WARNING : unsafe halfEdge deletion. Please unconnect nearby halfEdges first.2\n";
+		}
+		if (edges[id].getOrigin()->getIncidentEdge() == &edges[id]) {
+			edges[id].getOrigin()->setIncidentEdge(NULL);
+			std::cerr << "WARNING : unsafe halfEdge deletion. Please unconnect nearby halfEdges first.3\n";
+		}
+#endif
 		if (id >= edges.size())
 			throw cpp::Exception("Delete edges-index exceeds the size.");
 		else
@@ -227,6 +251,16 @@ public:
 	}
 	inline void deleteEdgeData(unsigned int id)
 	{
+#ifdef _DEBUG
+		if (edgeDataContainer[id].halfEdge_up->getData().edgeData == &edgeDataContainer[id]) {
+			edgeDataContainer[id].halfEdge_up->getData().edgeData = NULL;
+			std::cerr << "WARNING : unsafe edgeData deletion. Please unconnect halfEdges first.1\n";
+		}
+		if (edgeDataContainer[id].halfEdge_down->getData().edgeData == &edgeDataContainer[id]) {
+			edgeDataContainer[id].halfEdge_down->getData().edgeData = NULL;
+			std::cerr << "WARNING : unsafe edgeData deletion. Please unconnect halfEdges first.2\n";
+		}
+#endif
 		if (id >= edgeDataContainer.size())
 			throw cpp::Exception("Delete edgeDataContainer-index exceeds the size.");
 		else
@@ -260,6 +294,7 @@ private:
 		Arrangement::Vertex *v;
 		double x, y;
 
+		EventPoint() {}
 		EventPoint(Arrangement::Vertex *_v) {
 			v = _v;
 			x = v->getData().x;

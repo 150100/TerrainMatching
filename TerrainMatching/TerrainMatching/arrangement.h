@@ -295,6 +295,8 @@ private:
 	static Arrangement::Vertex * updateDCELProperIntersection(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2, double int_x, double int_y);
 	static Arrangement::EdgeData * updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement::EdgeData *ed);
 	static void updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangement::Vertex *v_erase);
+	static void updateDCELTwinEdgeWithOneSharedVertex(Arrangement::HalfEdge *he1, Arrangement::HalfEdge *he2);
+	static void updateDCELTwinEdgeWithTwoSharedVertex(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2);
 
 public:
 	SweepLine() {}

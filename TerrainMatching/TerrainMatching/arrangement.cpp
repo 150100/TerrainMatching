@@ -440,18 +440,6 @@ SweepLine::updateDCELProperIntersection(Arrangement::EdgeData *ed1, Arrangement:
 	ed1Nd->setTwin(ed1u);
 	v_int->setIncidentEdge(ed1Nu);
 
-#ifdef _DEBUG
-	Arrangement::EdgeIterator eit_debug(v_int);
-	while (eit_debug.hasNext())
-		eit_debug.getNext(); // circular termination test.
-	eit_debug.reset(ed1u->getOrigin());
-	while (eit_debug.hasNext())
-		eit_debug.getNext(); // circular termination test.
-	eit_debug.reset(ed1d->getOrigin());
-	while (eit_debug.hasNext())
-		eit_debug.getNext(); // circular termination test.
-#endif
-
 	// merge v_int to the edge ed2
 	updateDCELVertexEdgeIntersection(v_int, ed2);
 
@@ -500,29 +488,8 @@ SweepLine::updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement:
 	edNd->setTwin(edu);
 	v_dummy->setIncidentEdge(edNu);
 
-#ifdef _DEBUG
-	Arrangement::EdgeIterator eit_debug(v);
-	while (eit_debug.hasNext())
-		eit_debug.getNext(); // circular termination test.
-	eit_debug.reset(v_dummy);
-	while (eit_debug.hasNext())
-		eit_debug.getNext(); // circular termination test.
-#endif
-
 	// merge v_dummy to v
 	updateDCEL2VertexIntersection(v, v_dummy);
-
-#ifdef _DEBUG
-	eit_debug.reset(v);
-	while (eit_debug.hasNext())
-		eit_debug.getNext(); // circular termination test.
-	eit_debug.reset(edu->getOrigin());
-	while (eit_debug.hasNext())
-		eit_debug.getNext(); // circular termination test.
-	eit_debug.reset(edd->getOrigin());
-	while (eit_debug.hasNext())
-		eit_debug.getNext(); // circular termination test.
-#endif
 
 	return edN;
 }
@@ -629,10 +596,6 @@ void SweepLine::updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangemen
 		std::cerr << he->getData().edgeData << '(' << he << ',' << he->getTwin() << ')' << " - ";
 		he->getData().edgeData->print();
 		std::cerr << '\n';
-
-		Arrangement::EdgeIterator eit_debug_inner(he->getTwin()->getOrigin());
-		while (eit_debug_inner.hasNext())
-			eit_debug_inner.getNext(); // circular termination test.
 	}
 	std::cerr << '\n';
 #endif
@@ -668,10 +631,6 @@ void SweepLine::advance()
 #ifdef _DEBUG
 	std::cerr << "================== Event " << eventCount << " ======================\n";
 	std::cerr << "ep = (" << ep.x << ',' << ep.y << ')' << ep.v << "\n\n";
-
-	Arrangement::EdgeIterator eit_debug(ep.v);
-	while (eit_debug.hasNext())
-		eit_debug.getNext(); // circular termination test.
 #endif
 
 	while (events.top().x == ep.x && events.top().y == ep.y) { // while two event points have the same position, merge the point to ep.
@@ -826,10 +785,6 @@ void SweepLine::advance()
 					std::cerr << he->getData().edgeData << '(' << he << ',' << he->getTwin() << ')' << " - ";
 					he->getData().edgeData->print();
 					std::cerr << '\n';
-
-					Arrangement::EdgeIterator eit_debug_inner(he->getTwin()->getOrigin());
-					while (eit_debug_inner.hasNext())
-						eit_debug_inner.getNext(); // circular termination test.
 				}
 				std::cerr << '\n';
 #endif
@@ -859,24 +814,6 @@ void SweepLine::advance()
 					parent->deleteHalfEdge(id_he2);
 					unsigned int id_ed = he->getData().edgeData - &(parent->edgeDataContainer[0]);
 					parent->deleteEdgeData(id_ed);
-
-#ifdef _DEBUG
-					Arrangement::Face f1, f2;
-					f1.setBoundary((*hintit_prev)->halfEdge_down);
-					f2.setBoundary((*hintit_prev)->halfEdge_up);
-					eit_debug.reset(&f1);
-					while (eit_debug.hasNext())
-						eit_debug.getNext(); // circular termination test.
-					eit_debug.reset(&f2);
-					while (eit_debug.hasNext())
-						eit_debug.getNext(); // circular termination test.
-					eit_debug.reset((*hintit_prev)->halfEdge_up->getOrigin());
-					while (eit_debug.hasNext())
-						eit_debug.getNext(); // circular termination test.
-					eit_debug.reset((*hintit_prev)->halfEdge_down->getOrigin());
-					while (eit_debug.hasNext())
-						eit_debug.getNext(); // circular termination test.
-#endif
 				}
 				else if (he->getTwin()->getPrev() == he->getTwin()->getNext()) { // if he is inserted upside-upside of *hintit_prev,
 #ifdef _DEBUG
@@ -902,24 +839,6 @@ void SweepLine::advance()
 					parent->deleteHalfEdge(id_he2);
 					unsigned int id_ed = he->getData().edgeData - &(parent->edgeDataContainer[0]);
 					parent->deleteEdgeData(id_ed);
-
-#ifdef _DEBUG
-					Arrangement::Face f1, f2;
-					f1.setBoundary((*hintit_prev)->halfEdge_down);
-					f2.setBoundary((*hintit_prev)->halfEdge_up);
-					eit_debug.reset(&f1);
-					while (eit_debug.hasNext())
-						eit_debug.getNext(); // circular termination test.
-					eit_debug.reset(&f2);
-					while (eit_debug.hasNext())
-						eit_debug.getNext(); // circular termination test.
-					eit_debug.reset((*hintit_prev)->halfEdge_up->getOrigin());
-					while (eit_debug.hasNext())
-						eit_debug.getNext(); // circular termination test.
-					eit_debug.reset((*hintit_prev)->halfEdge_down->getOrigin());
-					while (eit_debug.hasNext())
-						eit_debug.getNext(); // circular termination test.
-#endif
 				}
 				else if (he->getPrev() == he->getNext()->getTwin()) { // if he is inserted downside-upside of *hintit_prev,
 					throw cpp::Exception("These two are not a twin-edge.1");
@@ -956,6 +875,7 @@ void SweepLine::advance()
 		}
 	}
 
+#ifdef _DEBUG
 	std::cerr << "Insert mode done.\n";
 	it_debug = edgeDataBBT.begin();
 	while (it_debug != edgeDataBBT.end()) {
@@ -965,10 +885,5 @@ void SweepLine::advance()
 		++it_debug;
 	}
 	std::cerr << '\n';
-
-#ifdef _DEBUG
-	eit_debug.reset(ep.v);
-	while (eit.hasNext())
-		eit.getNext(); // circular termination test.
 #endif
 }

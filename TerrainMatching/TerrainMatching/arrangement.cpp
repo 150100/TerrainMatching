@@ -23,6 +23,10 @@ public:
 
 	double x, y;
 
+	// lexicographical order
+	inline bool operator>(const Vector2<T> &v) const {
+		return x > v.x || (x == v.x && y > v.y);
+	}
 	// equal position
 	inline bool operator==(const Vector2<T> &v) const {
 		return x == v.x && y == v.y;
@@ -440,17 +444,6 @@ SweepLine::updateDCELProperIntersection(Arrangement::EdgeData *ed1, Arrangement:
 	ed1Nd->setTwin(ed1u);
 	v_int->setIncidentEdge(ed1Nu);
 
-#ifdef _DEBUG
-	Arrangement::EdgeIterator eit_debug(v_int);
-	while (eit_debug.hasNext()) {
-		Arrangement::HalfEdge *he = eit_debug.getNext();
-		std::cerr << he->getData().edgeData << '(' << he << ',' << he->getTwin() << ',' << he->getTwin()->getTwin() << ')' << " - ";
-		he->getData().edgeData->print();
-		std::cerr << '\n';
-	}
-	std::cerr << '\n';
-#endif
-
 	// merge v_int to the edge ed2
 	updateDCELVertexEdgeIntersection(v_int, ed2);
 
@@ -485,17 +478,6 @@ SweepLine::updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement:
 			std::cerr << "ERROR : " << i << '\n';
 	}
 #endif
-
-#ifdef _DEBUG
-	Arrangement::EdgeIterator eit_debug(v);
-	while (eit_debug.hasNext()) {
-		Arrangement::HalfEdge *he = eit_debug.getNext();
-		std::cerr << he->getData().edgeData << '(' << he << ',' << he->getTwin() << ',' << he->getTwin()->getTwin() << ')' << " - ";
-		he->getData().edgeData->print();
-		std::cerr << '\n';
-	}
-	std::cerr << '\n';
-#endif
 	// link edges and halfedges
 	ed->halfEdge_down = edNd;
 	edN->halfEdge_up = edNu;
@@ -516,25 +498,6 @@ SweepLine::updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement:
 	edNd->setTwin(edu);
 	v_dummy->setIncidentEdge(edNu);
 
-#ifdef _DEBUG
-	eit_debug.reset(v_dummy);
-	while (eit_debug.hasNext()) {
-		Arrangement::HalfEdge *he = eit_debug.getNext();
-		std::cerr << he->getData().edgeData << '(' << he << ',' << he->getTwin() << ',' << he->getTwin()->getTwin() << ')' << " - ";
-		he->getData().edgeData->print();
-		std::cerr << '\n';
-	}
-	std::cerr << '\n';
-
-	eit_debug.reset(v);
-	while (eit_debug.hasNext()) {
-		Arrangement::HalfEdge *he = eit_debug.getNext();
-		std::cerr << he->getData().edgeData << '(' << he << ',' << he->getTwin() << ',' << he->getTwin()->getTwin() << ')' << " - ";
-		he->getData().edgeData->print();
-		std::cerr << '\n';
-	}
-	std::cerr << '\n';
-#endif
 	// merge v_dummy to v
 	updateDCEL2VertexIntersection(v, v_dummy);
 
@@ -575,7 +538,6 @@ void SweepLine::updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangemen
 	}
 
 	// traverse incident edges of v_del and attach them to v
-	bool flipped = false;
 	for (unsigned int i = 0; i < incidentEdges_v_del.size(); ++i) {
 		Arrangement::HalfEdge *he = incidentEdges_v_del[i];
 		Vector2<double> vec_he = Vector2<double>(he->getTwin()->getOrigin()->getData()) - vec_v_del;
@@ -584,7 +546,7 @@ void SweepLine::updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangemen
 		bool insert = false;
 		while (!insert) {
 			if (vec_he_prev.isLeftFrom(vec_he_next)) { // not reflex angle
-				if (!vec_he_prev.isLeftFrom(vec_he_prev) && vec_he.isLeftFrom(vec_he_next)) insert = true; // if he is in [prev,next)
+				if (!vec_he.isLeftFrom(vec_he_prev) && vec_he.isLeftFrom(vec_he_next)) insert = true; // if he is in [prev,next)
 			}
 			else if (vec_he_next.isLeftFrom(vec_he_prev)) { // reflex angle
 				if (!vec_he.isLeftFrom(vec_he_prev) || vec_he.isLeftFrom(vec_he_next)) insert = true; // if he is in [prev,next)
@@ -605,29 +567,28 @@ void SweepLine::updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangemen
 			}
 			else if (vec_he_prev * vec_he_next > 0) { // 0-degree angle
 				// twin-edge handling (prev and next)
-				if (he_prev->getTwin()->getNext() == he_next)
+				if (vec_he_prev > Vector2<double>(0, 0) && vec_he_next > Vector2<double>(0, 0)) // if prev and next have the forward direction, merge them as a twin-edge.
 					updateDCELTwinEdgeWithOneSharedVertex(he_prev, he_next);
-				else if (he_next->getTwin()->getNext() == he_prev)
-					updateDCELTwinEdgeWithOneSharedVertex(he_next, he_prev);
-				else
-					throw cpp::Exception("he_prev and he_next are not adjacent edges.");
+#ifdef _DEBUG
+				if (vec_he_prev == Vector2<double>(0, 0) || vec_he_next == Vector2<double>(0, 0))
+					throw cpp::Exception("There should not be a zero-length edge.");
+#endif
 			}
 			else {
 				throw cpp::Exception("An edge should not be zero-length.");
 			}
-			
-			if (!insert) { // if not insert, get next range of incident edges of v
-				if (!eit.hasNext()) { eit.reset(); flipped = true; }
-				else flipped = false;
 
+			if (!insert) { // if not insert, get next range of incident edges of v
+				if (!eit.hasNext()) 
+					eit.reset(); // rewind iterator
 				he_prev = he_next;
 				vec_he_prev = vec_he_next;
 				he_next = eit.getNext();
 				vec_he_next = Vector2<double>(he_next->getTwin()->getOrigin()->getData()) - vec_v;
 			}
 			else { // if insert, 
-				// filter same-source edges
-				if (he_prev != he) continue;
+				if (he_prev == he)
+					continue; // filter same-source edges
 				
 				// link he to v between he_prev and he_next
 				he->setPrev(he_prev->getTwin());
@@ -635,13 +596,14 @@ void SweepLine::updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangemen
 				he->setOrigin(v);
 
 				// twin-edge handling (prev and he)
-				if (vec_he_prev.det(vec_he) == 0 && vec_he_prev * vec_he > 0) { // if prev and he have the same direction, merge them as a twin-edge.
-					updateDCELTwinEdgeWithOneSharedVertex(he_prev, he); // he will be survive.
+				if (vec_he_prev.det(vec_he) == 0 && 
+					vec_he_prev > Vector2<double>(0, 0) && vec_he > Vector2<double>(0, 0)) { // if prev and he have the same forward direction, merge them as a twin-edge.
+					updateDCELTwinEdgeWithOneSharedVertex(he_prev, he); // he_prev will survive.
 				}
-
-				// set insert edge as the "prev"
-				he_prev = he;
-				vec_he_prev = vec_he;
+				else { // set insert edge as the "prev"
+					he_prev = he;
+					vec_he_prev = vec_he;
+				}
 			}
 		}
 	}
@@ -655,7 +617,7 @@ void SweepLine::updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangemen
 	while (eit_debug.hasNext()) {
 		Arrangement::HalfEdge *he = eit_debug.getNext();
 		std::cerr << he->getData().edgeData << '(' << he << ',' << he->getTwin() << ')' << " - ";
-		he->getData().edgeData->print();
+		he->getData().edgeData->print(std::cerr);
 		std::cerr << '\n';
 	}
 	std::cerr << '\n';
@@ -667,18 +629,20 @@ void SweepLine::updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangemen
 #endif
 }
 
-// he1->twin->next == he2. direction of he1 and he2 are the same. he_next will be survive.
+// he_prev->twin->next == he_next.
+// direction of he_prev and he_next are the same forward-direction.
+// he_prev and he_next->twin will be survive.
 void SweepLine::updateDCELTwinEdgeWithOneSharedVertex(Arrangement::HalfEdge *he_prev, Arrangement::HalfEdge *he_next)
 {
 #ifdef _DEBUG
 	if (he_prev->getTwin()->getNext() != he_next)
-		throw cpp::Exception("he1 and he2 are not an adjacent halfedges.");
-	if (Vector2<double>(he_prev).det(Vector2<double>(he_next)) != 0)
-		throw cpp::Exception("he1 and he2 are not twin edge.");
+		throw cpp::Exception("he_prev and he_next are not an adjacent halfedges.");
+	if (Vector2<double>(he_prev).det(Vector2<double>(he_next)) != 0 && Vector2<double>(he_prev) > Vector2<double>(0, 0))
+		throw cpp::Exception("he_prev and he_next are not forward-direction same-direction segments.");
 #endif
 
+	// link he_prev and he_next at the endpoint of the twin-edge.
 	if (he_prev->getTwin()->getOrigin()->getData() < he_next->getTwin()->getOrigin()->getData()) { // if *inserted_it is shorter than he
-		cpp::Exception("WARNING : he_prev will be survive instead of he_next...");
 		updateDCELVertexEdgeIntersection(he_prev->getTwin()->getOrigin(), he_next->getData().edgeData);
 	}
 	else if (he_next->getTwin()->getOrigin()->getData() < he_prev->getTwin()->getOrigin()->getData()) { // if he is shorter than *inserted_it
@@ -688,52 +652,52 @@ void SweepLine::updateDCELTwinEdgeWithOneSharedVertex(Arrangement::HalfEdge *he_
 		updateDCEL2VertexIntersection(he_next->getTwin()->getOrigin(), he_prev->getTwin()->getOrigin());
 	}
 
-	if (Vector2<double>(he_prev).x > 0)
-		updateDCELTwinEdgeWithTwoSharedVertex(he_prev->getData().edgeData, he_next->getData().edgeData);
-	else if (Vector2<double>(he_prev).x > 0)
-		updateDCELTwinEdgeWithTwoSharedVertex(he_next->getData().edgeData, he_prev->getData().edgeData);
-	else
-		throw cpp::Exception("There is an edge parallel to the y-coordinate.");
+	// merge two edges to one twin-edge.
+	updateDCELTwinEdgeWithTwoSharedVertex(he_prev, he_next);
+
+	// unlink he_next from the endpoint of twin-edge.
+	he_prev->getTwin()->setNext(he_next->getTwin()->getNext());
 }
 
-// ed1 is above ed2. ed1 and ed2 are twin edge.
-void SweepLine::updateDCELTwinEdgeWithTwoSharedVertex(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2)
+// he_prev->twin->next == he_next.
+// he_prev and he_next are the same forward-direction segment.
+// he_prev and he_next->twin will be survive.
+void SweepLine::updateDCELTwinEdgeWithTwoSharedVertex(Arrangement::HalfEdge *he_prev, Arrangement::HalfEdge *he_next)
 {
 #ifdef _DEBUG
-	if (ed1->halfEdge_down->getNext() != ed2->halfEdge_up)
-		throw cpp::Exception("ed1 and ed2 are not twin edge.1");
-	if (ed1->halfEdge_down != ed2->halfEdge_up->getNext())
-		throw cpp::Exception("ed1 and ed2 are not twin edge.2");
+	if (he_prev->getTwin()->getNext() != he_next)
+		throw cpp::Exception("he_prev and he_next are not twin edge.1");
+	if (he_prev->getTwin() != he_next->getNext())
+		throw cpp::Exception("he_prev and he_next are not twin edge.2");
+	if (!(Vector2<double>(he_prev).det(Vector2<double>(he_next)) == 0 && Vector2<double>(he_prev) > Vector2<double>(0, 0)))
+		throw cpp::Exception("he_prev and he_next are not forward-direction same segment.");
 #endif
 
-	// merge ed2->halfEdge_up into ed1
-	if (ed2->halfEdge_up->getPrev() == ed2->halfEdge_up->getNext()) { // if ed2->halfEdge_up is inserted downside-downside of ed1,
-#ifdef _DEBUG
-		if (ed2->halfEdge_up->getNext() != ed1->halfEdge_down || ed2->halfEdge_up != ed1->halfEdge_down->getNext())
-			throw cpp::Exception("These two are not a twin-edge.0");
-#endif
+	// merge he_next to he_prev
+	if (he_next->getPrev() == he_next->getNext()) { // if he_next is inserted downside-downside of ed1,
 		/*
-		ed1->halfEdge_up
+		he_prev
 		===============
-		ed2->halfEdge_up->twin
+		he_next->twin
 		*/
-		unsigned int id_he1 = ed2->halfEdge_up - &(parent->edges[0]);
+		unsigned int id_he1 = he_next - &(parent->edges[0]);
 		parent->deleteHalfEdge(id_he1);
-		unsigned int id_he2 = ed1->halfEdge_down - &(parent->edges[0]);
+		unsigned int id_he2 = he_prev->getTwin() - &(parent->edges[0]);
 		parent->deleteHalfEdge(id_he2);
-		unsigned int id_ed = ed2->halfEdge_up->getData().edgeData - &(parent->edgeDataContainer[0]);
+		unsigned int id_ed = he_next->getData().edgeData - &(parent->edgeDataContainer[0]);
 		parent->deleteEdgeData(id_ed);
 
-		ed2->halfEdge_down->getData().edgeData = ed1;
-		ed1->halfEdge_down = ed2->halfEdge_down;
-		ed1->sources.insert(ed1->sources.end(), ed2->halfEdge_up->getData().edgeData->sources.begin(), ed2->halfEdge_up->getData().edgeData->sources.end());
-		ed1->halfEdge_up->setTwin(ed2->halfEdge_down);
+		he_next->getTwin()->getData().edgeData = he_prev->getData().edgeData;
+		he_prev->setTwin(he_next->getTwin());
 
-		ed1->halfEdge_up->getOrigin()->setIncidentEdge(ed1->halfEdge_up);
-		ed1->halfEdge_down->getOrigin()->setIncidentEdge(ed1->halfEdge_down);
+		he_prev->getData().edgeData->sources.insert(he_prev->getData().edgeData->sources.end(), he_next->getData().edgeData->sources.begin(), he_next->getData().edgeData->sources.end());
+		he_prev->getData().edgeData->halfEdge_down = he_prev->getTwin();
+
+		he_prev->getOrigin()->setIncidentEdge(he_prev);
+		he_prev->getTwin()->getOrigin()->setIncidentEdge(he_prev->getTwin());
 	}
 	else {
-		throw cpp::Exception("ed1 and ed2 are not twin edge.3");
+		throw cpp::Exception("he_prev and he_next are not twin edge.3");
 	}
 }
 
@@ -788,7 +752,7 @@ void SweepLine::advance()
 	EdgeDataBBTIterator it_debug = edgeDataBBT.begin();
 	while (it_debug != edgeDataBBT.end()) {
 		std::cerr << *it_debug << " = ";
-		(*it_debug)->print();
+		(*it_debug)->print(std::cerr);
 		std::cerr << '\n';
 		++it_debug;
 	}
@@ -874,19 +838,19 @@ void SweepLine::advance()
 			handleProperIntersectionEvent(ed2, ed1);
 		}
 	}
-
+/*
 #ifdef _DEBUG
 	std::cerr << "Erase mode done.\n";
 	it_debug = edgeDataBBT.begin();
 	while (it_debug != edgeDataBBT.end()) {
 		std::cerr << *it_debug << " = ";
-		(*it_debug)->print();
+		(*it_debug)->print(std::cerr);
 		std::cerr << '\n';
 		++it_debug;
 	}
 	std::cerr << '\n';
 #endif
-
+*/
 	// Insert mode. ¢Å
 	if (AEedge != NULL) {
 
@@ -902,47 +866,20 @@ void SweepLine::advance()
 		EdgeDataBBTIterator hintit = edgeDataBBT.upper_bound(he->getData().edgeData);
 		do { // insert only when he does not reach to BEedge or AEedge yet.
 			EdgeDataBBTIterator hintit_prev = hintit;
+#ifdef _DEBUG
 			if (hintit_prev != edgeDataBBT.begin() && Vector2<double>(he).det(Vector2<double>((*--hintit_prev)->halfEdge_up)) == 0) { // if he and *hintit_prev have the same slope, merge them.
-				std::cerr << "-- Twin edge. " << he->getData().edgeData << ' ' << *hintit_prev << '\n';
 				throw cpp::Exception("Twin edge cannot be here.");
-				//if ((*hintit_prev)->halfEdge_down->getOrigin()->getData() < he->getTwin()->getOrigin()->getData()) { // if *inserted_it is shorter than he
-				//	updateDCELVertexEdgeIntersection((*hintit_prev)->halfEdge_down->getOrigin(), he->getData().edgeData);
-				//}
-				//else if (he->getTwin()->getOrigin()->getData() < (*hintit_prev)->halfEdge_down->getOrigin()->getData()) { // if he is shorter than *inserted_it
-				//	updateDCELVertexEdgeIntersection(he->getTwin()->getOrigin(), (*hintit_prev));
-				//}
-				//else { // if *inserted_it and he are the same, merge them at the twin-vertex
-				//	updateDCEL2VertexIntersection(he->getTwin()->getOrigin(), (*hintit_prev)->halfEdge_down->getOrigin());
-				//}
-
-				//// merge he into *hintit_prev
-				//if (he->getPrev() == he->getNext()) { // if he is inserted downside-downside of *hintit_prev,
-				//	updateDCELTwinEdge(*hintit_prev, he->getData().edgeData);
-				//}
-				//else if (he->getTwin()->getPrev() == he->getTwin()->getNext()) { // if he is inserted upside-upside of *hintit_prev,
-				//	updateDCELTwinEdge(he->getData().edgeData, *hintit_prev);
-				//}
-				//else if (he->getPrev() == he->getNext()->getTwin()) { // if he is inserted downside-upside of *hintit_prev,
-				//	throw cpp::Exception("These two are not a twin-edge.1");
-				//}
-				//else if (he->getTwin()->getNext() == he->getNext()->getTwin()) { // if he is inserted upside-downside of *hintit_prev,
-				//	throw cpp::Exception("These two are not a twin-edge.2");
-				//}
-				//else {
-				//	throw cpp::Exception("These two are not a twin-edge.3");
-				//}
 			}
-			else { // else, insert it and prepare for the next iteration.
-				EdgeDataBBTIterator inserted_it = edgeDataBBT.insert(hintit, he->getData().edgeData);
-				// update lowerbound and upperbound.
-				if (!after_first) {
-					after_first = true;
-					inserted_lowerbound = inserted_it;
-				}
-				inserted_upperbound = inserted_it;
-
-				hintit = ++inserted_it; // update hint.
+#endif
+			EdgeDataBBTIterator inserted_it = edgeDataBBT.insert(hintit, he->getData().edgeData);
+			// update lowerbound and upperbound.
+			if (!after_first) {
+				after_first = true;
+				inserted_lowerbound = inserted_it;
 			}
+			inserted_upperbound = inserted_it;
+
+			hintit = ++inserted_it; // update hint.
 			he = AEeit.getNext(); // next step.
 		} while (he != BEedge && he != AEedge);
 
@@ -962,7 +899,7 @@ void SweepLine::advance()
 	it_debug = edgeDataBBT.begin();
 	while (it_debug != edgeDataBBT.end()) {
 		std::cerr << *it_debug <<  " = ";
-		(*it_debug)->print();
+		(*it_debug)->print(std::cerr);
 		std::cerr << '\n';
 		++it_debug;
 	}

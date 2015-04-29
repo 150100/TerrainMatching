@@ -34,8 +34,8 @@ public:
 		return x == vd.x && y == vd.y;
 	}
 
-	inline void print() {
-		std::cerr << std::setprecision(6) << '(' << x << ',' << y << ')';
+	inline void print(std::ostream &os) {
+		os << std::setprecision(6) << '(' << x << ',' << y << ')';
 	}
 };
 
@@ -86,10 +86,10 @@ public:
 	HalfEdgeT<ArrangementVertexData, ArrangementHalfEdgeData, ArrangementFaceData> 
 		*halfEdge_up, *halfEdge_down;
 	
-	inline void print() {
-		halfEdge_up->getOrigin()->getData().print();
-		std::cerr << " -> ";
-		halfEdge_down->getOrigin()->getData().print();
+	inline void print(std::ostream &os) {
+		halfEdge_up->getOrigin()->getData().print(os);
+		os << " -> ";
+		halfEdge_down->getOrigin()->getData().print(os);
 	}
 };
 
@@ -295,8 +295,8 @@ private:
 	static Arrangement::Vertex * updateDCELProperIntersection(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2, double int_x, double int_y);
 	static Arrangement::EdgeData * updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement::EdgeData *ed);
 	static void updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangement::Vertex *v_erase);
-	static void updateDCELTwinEdgeWithOneSharedVertex(Arrangement::HalfEdge *he1, Arrangement::HalfEdge *he2);
-	static void updateDCELTwinEdgeWithTwoSharedVertex(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2);
+	static void updateDCELTwinEdgeWithOneSharedVertex(Arrangement::HalfEdge *he_prev, Arrangement::HalfEdge *he_next);
+	static void updateDCELTwinEdgeWithTwoSharedVertex(Arrangement::HalfEdge *he_prev, Arrangement::HalfEdge *he_next);
 
 public:
 	SweepLine() {}

@@ -15,6 +15,7 @@
 ///
 
 class ArrangementEdgeData;
+class Event;
 
 ///
 
@@ -23,8 +24,9 @@ class ArrangementVertexData
 {
 public:
     double x,y; // coordinates
+	std::multiset<Event, std::greater<Event>>::iterator it_eventQueue;
 
-    ArrangementVertexData() { x = 0; y = 0; }
+	ArrangementVertexData() { x = 0; y = 0; it_eventQueue._Ptr = NULL; }
 	ArrangementVertexData(Terrain::VertexData &tvd) { x = tvd.p.x; y = tvd.p.y; }
 
 	inline bool operator< (const ArrangementVertexData &vd) const {
@@ -248,30 +250,31 @@ protected:
 	static SweepLine sweepLine;
 };
 
+// Sweepline event point.
+class Event
+{
+public:
+	Arrangement::Vertex *v;
+	double x, y;
+
+	Event() {}
+	Event(Arrangement::Vertex *_v) {
+		v = _v;
+		x = v->getData().x;
+		y = v->getData().y;
+	}
+
+	bool operator<(const Event &ep) const {
+		return x < ep.x || (x == ep.x && y < ep.y); // lexicographical ordering
+	}
+};
+
 // Sweep from left to right.
 // BBT is sorted downward.
 // Make sure that the parent arrangement has enough reserved space (at least order of nm^2).
 class SweepLine
 {
 private:
-	class EventPoint
-	{
-	public:
-		Arrangement::Vertex *v;
-		double x, y;
-
-		EventPoint() {}
-		EventPoint(Arrangement::Vertex *_v) {
-			v = _v;
-			x = v->getData().x;
-			y = v->getData().y;
-		}
-
-		bool operator>(const EventPoint &ep) const {
-			return x > ep.x || (x == ep.x && y > ep.y); // lexicographical ordering
-		}
-	};
-
 	class EdgeDataCompare
 	{
 	public:
@@ -280,14 +283,14 @@ private:
 	};
 
 public:
-	typedef std::priority_queue<EventPoint, std::vector<EventPoint>, std::greater<EventPoint>> EventQueue;
+	typedef std::multiset<Event, std::less<Event>> EventQueue;
 	typedef std::multiset<Arrangement::EdgeData *, EdgeDataCompare> EdgeDataBBT;
 	typedef std::multiset<Arrangement::EdgeData *, EdgeDataCompare>::iterator EdgeDataBBTIterator;
 
 private:
 	static Arrangement *parent;
 	static EventQueue events;
-	static EventPoint *currentEvent;
+	static Event *currentEvent;
 	static EdgeDataBBT edgeDataBBT;
 	static int eventCount;
 

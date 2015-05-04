@@ -6,7 +6,7 @@ SweepLine Arrangement::sweepLine;
 
 Arrangement *SweepLine::parent = NULL;
 SweepLine::EventQueue SweepLine::events;
-SweepLine::EventPoint *SweepLine::currentEvent = NULL;
+Event *SweepLine::currentEvent = NULL;
 SweepLine::EdgeDataBBT SweepLine::edgeDataBBT;
 int SweepLine::eventCount = 0;
 
@@ -318,7 +318,7 @@ bool SweepLine::handleProperIntersectionEvent(Arrangement::EdgeData *ed1, Arrang
 		// if two edges properly intersect, create new intersection event.
 		std::cerr << "-- Intersection : (" << x_det / det << ',' << y_det / det << ") " << ed1 << ' ' << ed2 << '\n';
 		Arrangement::Vertex *v = updateDCELProperIntersection(ed1, ed2, x_det / det, y_det / det);
-		events.push(EventPoint(v));
+		v->getData().it_eventQueue = events.insert(Event(v));
 		return true;
 	}
 	else { // if segments not intersect, return false.
@@ -611,6 +611,10 @@ void SweepLine::updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangemen
 	// erase v_del (lazy)
 	unsigned int id = v_del - &(parent->vertices[0]);
 	parent->deleteVertex(id);
+	if (v_del->getData().it_eventQueue._Ptr != NULL) {
+		events.erase(v_del->getData().it_eventQueue);
+		v_del->getData().it_eventQueue._Ptr = NULL;
+	}
 
 #ifdef _DEBUG
 	Arrangement::EdgeIterator eit_debug(v);
@@ -710,17 +714,17 @@ void SweepLine::initialize(Arrangement *_parent)
 	for (unsigned int i = 0; i < parent->vertices.size(); ++i)
 	{
 		Arrangement::Vertex *v = &parent->vertices.at(i);
-		events.push(EventPoint(v));
+		v->getData().it_eventQueue = events.insert(Event(v));
 	}
 }
 
 void SweepLine::advance()
 {
 	// Take the first event
-	EventPoint ep;
+	Event ep;
 	do { // take event point only when the location meets. (they can unmatch because of deletion and insertion of vertices)
-		ep = events.top();
-		events.pop();
+		ep = *events.begin();
+		events.erase(events.begin());
 	} while (ep.x != ep.v->getData().x || ep.y != ep.v->getData().y);
 	++eventCount;
 	currentEvent = &ep;
@@ -731,22 +735,11 @@ void SweepLine::advance()
 	std::cerr << "ep = (" << ep.x << ',' << ep.y << ')' << ep.v << "\n\n";
 #endif
 
-	while (events.top().x == ep.x && events.top().y == ep.y) { // while two event points have the same position, merge the point to ep.
-		EventPoint ep_next;
-		ep_next = events.top();
-		events.pop();
-		if (ep_next.v != ep_next.v->getIncidentEdge()->getOrigin()) {
-			// take event point only when the link valid. (they can be unmatched because of deletion and insertion of vertices)
-			continue;
-		}
-		else if (ep_next.x != ep_next.v->getData().x || ep_next.y != ep_next.v->getData().y) {
-			// take event point only when the position valid. (they can be unmatched because of deletion and insertion of vertices)
-			continue;
-		}
-		else {
-			std::cerr << "ep_next = (" << ep_next.x << ',' << ep_next.y << ')' << ep_next.v << "\n\n";
-			updateDCEL2VertexIntersection(ep.v, ep_next.v);
-		}
+	while (events.begin()->x == ep.x && events.begin()->y == ep.y) { // while two event points have the same position, merge the point to ep.
+#ifdef _DEBUG
+		std::cerr << "ep_next = (" << events.begin()->x << ',' << events.begin()->y << ')' << events.begin()->v << "\n\n";
+#endif
+		updateDCEL2VertexIntersection(ep.v, events.begin()->v); // contains "events.erase(events.begin());"
 	}
 
 #ifdef _DEBUG

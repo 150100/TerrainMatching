@@ -12,19 +12,12 @@ TranslationSpaceSubdivision::TranslationSpaceSubdivision(Terrain *_t1, Terrain *
 void TranslationSpaceSubdivision::init()
 {
     // find a boundary halfedge incident to the unbounded face.
-	Arrangement::HalfEdge* he = NULL;
-    for (unsigned int i=0; i < arr.number_of_halfedges(); ++i)
-    {
-        if (arr.edges[i].getFace() == NULL) {
-            he = &arr.edges[i];
-            break;
-        }
-    }
+	Arrangement::HalfEdge* he = arr.getFirstHalfEdge();
 
 	// test of he
 	if (he == NULL) throw cpp::Exception("There is no outer-face.");
 	if (he->getTwin()->getFace() == NULL) throw cpp::Exception("First face is NULL. (TSS::init())");
-	if (he->getFace() != NULL) throw cpp::Exception("Outer face is not NULL. (TSS::init())");
+	if (he->getFace() != arr.getOuterface()) throw cpp::Exception("Outer face is not NULL. (TSS::init())");
 
     // initialize first cell
     update_CS(he);

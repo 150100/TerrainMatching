@@ -16,6 +16,7 @@
 
 class ArrangementEdgeData;
 class Event;
+class SweepLine;
 
 ///
 
@@ -62,6 +63,13 @@ public:
     ArrangementFaceData() : state(NOTPASSED) {}
 };
 
+class ArrangementEdgeDataCompare
+{
+public:
+	ArrangementEdgeDataCompare() {}
+	inline bool operator()(const ArrangementEdgeData *ed1, const ArrangementEdgeData *ed2) const; // ed1 > ed2
+};
+
 // information of edge
 class ArrangementEdgeData
 {
@@ -82,12 +90,15 @@ public:
 
 	typedef std::vector<Source>::iterator SourceIterator;
 
-	ArrangementEdgeData() {}
-
 	std::vector<Source> sources;
 	HalfEdgeT<ArrangementVertexData, ArrangementHalfEdgeData, ArrangementFaceData> 
 		*halfEdge_up, *halfEdge_down;
-	
+	std::multiset<ArrangementEdgeData *, ArrangementEdgeDataCompare>::iterator it_edgeDataBBT;
+
+	ArrangementEdgeData() { halfEdge_up = NULL; halfEdge_down = NULL; it_edgeDataBBT._Ptr = NULL; }
+
+	inline bool operator<(const ArrangementEdgeData &ed);
+
 	inline void print(std::ostream &os) {
 		halfEdge_up->getOrigin()->getData().print(os);
 		os << " -> ";
@@ -96,8 +107,7 @@ public:
 };
 
 ///
-class SweepLine;
-// TO DO : This should be singleton.
+
 class Arrangement
 {
 public:
@@ -125,10 +135,11 @@ public:
 
 	~Arrangement() {}
 	
-	inline unsigned int number_of_vertices() { return vertices.size(); }
-	inline unsigned int number_of_halfedges() { return edges.size(); }
-	inline unsigned int number_of_edges() { return edgeDataContainer.size(); }
-	inline unsigned int number_of_faces() { return faces.size(); }
+	inline unsigned int number_of_vertices() { return vertices.size() - erasedVerticesIndices.size(); }
+	inline unsigned int number_of_halfedges() { return edges.size() - erasedEdgesIndices.size(); }
+	inline unsigned int number_of_edges() { return edgeDataContainer.size() - erasedEdgeDataContainerIndices.size(); }
+	inline unsigned int number_of_faces() { return faces.size() - erasedFacesIndices.size(); }
+
 	inline Vertex* createVertex()
 	{
 		if (erasedVerticesIndices.empty()) {
@@ -142,8 +153,9 @@ public:
 			}
 		}
 		else {
-			unsigned int id = erasedVerticesIndices.front();
-			erasedVerticesIndices.pop();
+			auto idit = erasedVerticesIndices.begin();
+			unsigned int id = *idit;
+			erasedVerticesIndices.erase(idit);
 			vertices[id] = Vertex(); // initialize
 			return &vertices[id];
 		}
@@ -161,8 +173,9 @@ public:
 			}
 		}
 		else {
-			unsigned int id = erasedEdgesIndices.front();
-			erasedEdgesIndices.pop();
+			auto idit = erasedEdgesIndices.begin();
+			unsigned int id = *idit;
+			erasedEdgesIndices.erase(idit);
 			edges[id] = HalfEdge(); // initialize
 			return &edges[id];
 		}
@@ -180,8 +193,9 @@ public:
 			}
 		}
 		else {
-			unsigned int id = erasedFacesIndices.front();
-			erasedFacesIndices.pop();
+			auto idit = erasedFacesIndices.begin();
+			unsigned int id = *idit;
+			erasedFacesIndices.erase(idit);
 			faces[id] = Face(); // initialize
 			return &faces[id];
 		}
@@ -199,8 +213,9 @@ public:
 			}
 		}
 		else {
-			unsigned int id = erasedEdgeDataContainerIndices.front();
-			erasedEdgeDataContainerIndices.pop();
+			auto idit = erasedEdgeDataContainerIndices.begin();
+			unsigned int id = *idit;
+			erasedEdgeDataContainerIndices.erase(idit);
 			edgeDataContainer[id] = EdgeData(); // initialize
 			return &edgeDataContainer[id];
 		}
@@ -211,28 +226,49 @@ public:
 		if (id >= vertices.size())
 			throw cpp::Exception("Delete vertices-index exceeds the size.");
 		else
-			erasedVerticesIndices.push(id);
+			erasedVerticesIndices.insert(id);
 	}
 	inline void deleteHalfEdge(unsigned int id)
 	{
 		if (id >= edges.size())
 			throw cpp::Exception("Delete edges-index exceeds the size.");
 		else
-			erasedEdgesIndices.push(id);
+			erasedEdgesIndices.insert(id);
 	}
 	inline void deleteFace(unsigned int id)
 	{
 		if (id >= faces.size())
 			throw cpp::Exception("Delete faces-index exceeds the size.");
 		else
-			erasedFacesIndices.push(id);
+			erasedFacesIndices.insert(id);
 	}
 	inline void deleteEdgeData(unsigned int id)
 	{
 		if (id >= edgeDataContainer.size())
 			throw cpp::Exception("Delete edgeDataContainer-index exceeds the size.");
 		else
-			erasedEdgeDataContainerIndices.push(id);
+			erasedEdgeDataContainerIndices.insert(id);
+	}
+
+	// Get the outerface.
+	inline Face* getOuterface() {
+		return &faces.at(outerface);
+	}
+	// Set the outerface. (Set firstHalfEdge first.)
+	inline void setOuterface(Face *f) {
+		outerface = f - &faces[0];
+#ifdef _DEBUG
+		if (&faces[outerface] != edges[firstHalfEdge].getFace())
+			throw cpp::Exception("Outerface should be an adjacent face of firstHalfEdge.");
+#endif
+	}
+	// Get a halfedge whose adjacent face is outerface.
+	inline HalfEdge* getFirstHalfEdge() {
+		return &edges.at(firstHalfEdge);
+	}
+	// Set the halfedge whose adjacent face is outerface.
+	inline void setFirstHalfEdge(HalfEdge *he) {
+		firstHalfEdge = he - &edges[0];
 	}
 
 	std::vector<Vertex> vertices;
@@ -240,13 +276,14 @@ public:
 	std::vector<Face> faces;
 	std::vector<EdgeData> edgeDataContainer;
 
-protected:
-	std::queue<unsigned int> erasedVerticesIndices;
-	std::queue<unsigned int> erasedEdgesIndices;
-	std::queue<unsigned int> erasedFacesIndices;
-	std::queue<unsigned int> erasedEdgeDataContainerIndices;
+	std::set<unsigned int> erasedVerticesIndices;
+	std::set<unsigned int> erasedEdgesIndices;
+	std::set<unsigned int> erasedFacesIndices;
+	std::set<unsigned int> erasedEdgeDataContainerIndices;
 
-protected:
+private:
+	unsigned int firstHalfEdge;
+	unsigned int outerface;
 	static SweepLine sweepLine;
 };
 
@@ -274,18 +311,11 @@ public:
 // Make sure that the parent arrangement has enough reserved space (at least order of nm^2).
 class SweepLine
 {
-private:
-	class EdgeDataCompare
-	{
-	public:
-		EdgeDataCompare() {}
-		inline bool operator()(const Arrangement::EdgeData *ed1, const Arrangement::EdgeData *ed2) const; // ed1 > ed2
-	};
-
 public:
 	typedef std::multiset<Event, std::less<Event>> EventQueue;
-	typedef std::multiset<Arrangement::EdgeData *, EdgeDataCompare> EdgeDataBBT;
-	typedef std::multiset<Arrangement::EdgeData *, EdgeDataCompare>::iterator EdgeDataBBTIterator;
+	typedef std::multiset<Event, std::less<Event>>::iterator EventQueueIterator;
+	typedef std::multiset<Arrangement::EdgeData *, ArrangementEdgeDataCompare> EdgeDataBBT;
+	typedef std::multiset<Arrangement::EdgeData *, ArrangementEdgeDataCompare>::iterator EdgeDataBBTIterator;
 
 private:
 	static Arrangement *parent;
@@ -293,10 +323,46 @@ private:
 	static Event *currentEvent;
 	static EdgeDataBBT edgeDataBBT;
 	static int eventCount;
+	static bool firstEvent;
+
+	static EventQueueIterator events_insert(Arrangement::Vertex *v) {
+		EventQueueIterator it = events.insert(Event(v));
+		v->getData().it_eventQueue = it;
+		return it;
+	}
+	static EventQueueIterator events_erase(Arrangement::Vertex *v) {
+		EventQueueIterator it;
+		if (v->getData().it_eventQueue._Ptr != NULL) {
+			it = events.erase(v->getData().it_eventQueue);
+			v->getData().it_eventQueue._Ptr = NULL;
+		}
+		return it;
+	}
+	static Event events_popfront() {
+		Event e = *events.begin();
+		events.erase(events.begin());
+		e.v->getData().it_eventQueue._Ptr = NULL;
+		return e;
+	}
+
+	static EdgeDataBBTIterator edgeDataBBT_insert(Arrangement::EdgeData *ed) {
+		EdgeDataBBTIterator it = edgeDataBBT.insert(ed);
+		ed->it_edgeDataBBT = it;
+		return it;
+	}
+	static EdgeDataBBTIterator edgeDataBBT_insert(EdgeDataBBTIterator hintit, Arrangement::EdgeData *ed) {
+		EdgeDataBBTIterator it = edgeDataBBT.insert(hintit, ed);
+		ed->it_edgeDataBBT = it;
+		return it;
+	}
+	static EdgeDataBBTIterator edgeDataBBT_erase(Arrangement::EdgeData *ed) {
+		return edgeDataBBT.erase(ed->it_edgeDataBBT);
+		ed->it_edgeDataBBT._Ptr = NULL;
+	}
 
 	static bool handleProperIntersectionEvent(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2);
-	static Arrangement::Vertex * updateDCELProperIntersection(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2, double int_x, double int_y);
-	static Arrangement::EdgeData * updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement::EdgeData *ed);
+	static Arrangement::Vertex* updateDCELProperIntersection(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2, double int_x, double int_y);
+	static Arrangement::EdgeData* updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement::EdgeData *ed);
 	static void updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangement::Vertex *v_erase);
 	static void updateDCELTwinEdgeWithOneSharedVertex(Arrangement::HalfEdge *he_prev, Arrangement::HalfEdge *he_next);
 	static void updateDCELTwinEdgeWithTwoSharedVertex(Arrangement::HalfEdge *he_prev, Arrangement::HalfEdge *he_next);

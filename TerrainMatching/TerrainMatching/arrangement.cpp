@@ -639,6 +639,10 @@ void SweepLine::updateDCELTwinEdgeWithOneSharedVertex(Arrangement::HalfEdge *he_
 		throw cpp::Exception("he_prev and he_next are not an adjacent halfedges.");
 	if (Vector2<double>(he_prev).det(Vector2<double>(he_next)) != 0 && Vector2<double>(he_prev) > Vector2<double>(0, 0))
 		throw cpp::Exception("he_prev and he_next are not forward-direction same-direction segments.");
+	Arrangement::HalfEdge *he_survive_up = he_prev;
+	Arrangement::HalfEdge *he_survive_down = he_next->getTwin();
+	Arrangement::HalfEdge *he_dead_up = he_prev->getTwin();
+	Arrangement::HalfEdge *he_dead_down = he_next;
 #endif
 
 	// link he_prev and he_next at the endpoint of the twin-edge.
@@ -661,7 +665,7 @@ void SweepLine::updateDCELTwinEdgeWithOneSharedVertex(Arrangement::HalfEdge *he_
 
 // he_prev->twin->next == he_next.
 // he_prev and he_next are the same forward-direction segment.
-// he_prev and he_next->twin will be survive.
+// he_prev, he_next->twin, and edgedata of he_prev will be survive.
 void SweepLine::updateDCELTwinEdgeWithTwoSharedVertex(Arrangement::HalfEdge *he_prev, Arrangement::HalfEdge *he_next)
 {
 #ifdef _DEBUG
@@ -673,32 +677,26 @@ void SweepLine::updateDCELTwinEdgeWithTwoSharedVertex(Arrangement::HalfEdge *he_
 		throw cpp::Exception("he_prev and he_next are not forward-direction same segment.");
 #endif
 
-	// merge he_next to he_prev
-	if (he_next->getPrev() == he_next->getNext()) { // if he_next is inserted downside-downside of ed1,
-		/*
-		he_prev
-		===============
-		he_next->twin
-		*/
-		unsigned int id_he1 = he_next - &(parent->edges[0]);
-		parent->deleteHalfEdge(id_he1);
-		unsigned int id_he2 = he_prev->getTwin() - &(parent->edges[0]);
-		parent->deleteHalfEdge(id_he2);
-		unsigned int id_ed = he_next->getData().edgeData - &(parent->edgeDataContainer[0]);
-		parent->deleteEdgeData(id_ed);
+	/*
+	he_prev
+	===============
+	he_next->twin
+	*/
+	unsigned int id_he1 = he_next - &(parent->edges[0]);
+	parent->deleteHalfEdge(id_he1);
+	unsigned int id_he2 = he_prev->getTwin() - &(parent->edges[0]);
+	parent->deleteHalfEdge(id_he2);
+	unsigned int id_ed = he_next->getData().edgeData - &(parent->edgeDataContainer[0]);
+	parent->deleteEdgeData(id_ed);
 
-		he_next->getTwin()->getData().edgeData = he_prev->getData().edgeData;
-		he_prev->setTwin(he_next->getTwin());
+	he_next->getTwin()->getData().edgeData = he_prev->getData().edgeData;
+	he_prev->setTwin(he_next->getTwin());
 
-		he_prev->getData().edgeData->sources.insert(he_prev->getData().edgeData->sources.end(), he_next->getData().edgeData->sources.begin(), he_next->getData().edgeData->sources.end());
-		he_prev->getData().edgeData->halfEdge_down = he_prev->getTwin();
+	he_prev->getData().edgeData->sources.insert(he_prev->getData().edgeData->sources.end(), he_next->getData().edgeData->sources.begin(), he_next->getData().edgeData->sources.end());
+	he_prev->getData().edgeData->halfEdge_down = he_prev->getTwin();
 
-		he_prev->getOrigin()->setIncidentEdge(he_prev);
-		he_prev->getTwin()->getOrigin()->setIncidentEdge(he_prev->getTwin());
-	}
-	else {
-		throw cpp::Exception("he_prev and he_next are not twin edge.3");
-	}
+	he_prev->getOrigin()->setIncidentEdge(he_prev);
+	he_prev->getTwin()->getOrigin()->setIncidentEdge(he_prev->getTwin());
 }
 
 void SweepLine::initialize(Arrangement *_parent)
@@ -737,8 +735,12 @@ void SweepLine::advance()
 		EventPoint ep_next;
 		ep_next = events.top();
 		events.pop();
-		if (ep_next.x != ep_next.v->getData().x || ep_next.y != ep_next.v->getData().y) {
-			// take event point only when the location meets. (they can unmatch because of deletion and insertion of vertices)
+		if (ep_next.v != ep_next.v->getIncidentEdge()->getOrigin()) {
+			// take event point only when the link valid. (they can be unmatched because of deletion and insertion of vertices)
+			continue;
+		}
+		else if (ep_next.x != ep_next.v->getData().x || ep_next.y != ep_next.v->getData().y) {
+			// take event point only when the position valid. (they can be unmatched because of deletion and insertion of vertices)
 			continue;
 		}
 		else {
@@ -906,3 +908,4 @@ void SweepLine::advance()
 	std::cerr << '\n';
 #endif
 }
+

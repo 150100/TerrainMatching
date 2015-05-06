@@ -11,13 +11,13 @@ BasisResult CombinatorialStructure::solveLP(std::vector<Point> boundary_pts)
             if (z_p > z_max) z_max = z_p;
         }
 
-        if (z_min != std::numeric_limits<double>::infinity())
+        if (z_min == std::numeric_limits<double>::infinity())
             throw cpp::Exception("z_min not updated. (CombinatorialStructure::solveLP)");
-        if (z_max != -std::numeric_limits<double>::infinity())
+        if (z_max == -std::numeric_limits<double>::infinity())
             throw cpp::Exception("z_max not updated. (CombinatorialStructure::solveLP)");
 
         double z_diff = (z_max - z_min) / 2.0;
-        if (z_diff >= 0)
+        if (z_diff <= 0)
             throw cpp::Exception("z_diff should be positive. (CombinatorialStructure::solveLP)");
 
         double z_mid = z_min + z_diff;
@@ -262,7 +262,7 @@ BasisResult CombinatorialStructure::solveLP(std::vector<Point> boundary_pts)
 ////    char c;
 ////    std::cin >> c;
 
-    return br;
+    //return br;
 }
 
 void CombinatorialStructure::printPlanes()

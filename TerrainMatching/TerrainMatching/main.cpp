@@ -133,7 +133,7 @@ int main(int argc, char **argv)
         do {
             //std::cin >> ch;
             ++num;
-            if (num % 1 == 0) std::cerr << "\n== Cell " << num << " ==" << std::endl;
+            if (num % 1000 == 0) std::cerr << "\n== Cell " << num << " ==" << std::endl;
             //tss.printCSPlanes();
             //std::cerr << ".........." << std::endl;
 

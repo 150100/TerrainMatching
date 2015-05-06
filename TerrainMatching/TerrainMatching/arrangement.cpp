@@ -737,11 +737,11 @@ void SweepLine::advance()
 	++eventCount;
 	currentEvent = &ep;
 
+#ifdef DEBUG
 	if (eventCount % 1000 == 0) {
 		std::cerr << edgeDataBBT.size() << '\n';
 	}
-	
-#ifdef DEBUG
+
 	std::cerr << "================== Event " << eventCount << " ======================\n";
 	std::cerr << "ep = (" << ep.x << ',' << ep.y << ')' << ep.v << "\n";
 #endif

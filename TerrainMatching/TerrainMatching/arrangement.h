@@ -97,8 +97,6 @@ public:
 
 	ArrangementEdgeData() { halfEdge_up = NULL; halfEdge_down = NULL; it_edgeDataBBT._Ptr = NULL; }
 
-	inline bool operator<(const ArrangementEdgeData &ed);
-
 	inline void print(std::ostream &os) {
 		halfEdge_up->getOrigin()->getData().print(os);
 		os << " -> ";
@@ -136,7 +134,7 @@ public:
 	~Arrangement() {}
 	
 	inline unsigned int number_of_vertices() { return vertices.size() - erasedVerticesIndices.size(); }
-	inline unsigned int number_of_halfedges() { return edges.size() - erasedEdgesIndices.size(); }
+	inline unsigned int number_of_halfedges() { return halfEdges.size() - erasedHalfEdgesIndices.size(); }
 	inline unsigned int number_of_edges() { return edgeDataContainer.size() - erasedEdgeDataContainerIndices.size(); }
 	inline unsigned int number_of_faces() { return faces.size() - erasedFacesIndices.size(); }
 
@@ -162,22 +160,22 @@ public:
 	}
 	inline HalfEdge* createHalfEdge()
 	{
-		if (erasedEdgesIndices.empty()) {
-			if (edges.capacity() == edges.size()) {
-				throw cpp::Exception("Edges capacity over.");
+		if (erasedHalfEdgesIndices.empty()) {
+			if (halfEdges.capacity() == halfEdges.size()) {
+				throw cpp::Exception("HalfEdges capacity over.");
 				return NULL;
 			}
 			else {
-				edges.push_back(HalfEdge());
-				return &edges.back();
+				halfEdges.push_back(HalfEdge());
+				return &halfEdges.back();
 			}
 		}
 		else {
-			auto idit = erasedEdgesIndices.begin();
+			auto idit = erasedHalfEdgesIndices.begin();
 			unsigned int id = *idit;
-			erasedEdgesIndices.erase(idit);
-			edges[id] = HalfEdge(); // initialize
-			return &edges[id];
+			erasedHalfEdgesIndices.erase(idit);
+			halfEdges[id] = HalfEdge(); // initialize
+			return &halfEdges[id];
 		}
 	}
 	inline Face* createFace()
@@ -230,10 +228,10 @@ public:
 	}
 	inline void deleteHalfEdge(unsigned int id)
 	{
-		if (id >= edges.size())
-			throw cpp::Exception("Delete edges-index exceeds the size.");
+		if (id >= halfEdges.size())
+			throw cpp::Exception("Delete halfEdges-index exceeds the size.");
 		else
-			erasedEdgesIndices.insert(id);
+			erasedHalfEdgesIndices.insert(id);
 	}
 	inline void deleteFace(unsigned int id)
 	{
@@ -258,26 +256,26 @@ public:
 	inline void setOuterface(Face *f) {
 		outerface = f - &faces[0];
 #ifdef _DEBUG
-		if (&faces[outerface] != edges[firstHalfEdge].getFace())
+		if (&faces[outerface] != halfEdges[firstHalfEdge].getFace())
 			throw cpp::Exception("Outerface should be an adjacent face of firstHalfEdge.");
 #endif
 	}
 	// Get a halfedge whose adjacent face is outerface.
 	inline HalfEdge* getFirstHalfEdge() {
-		return &edges.at(firstHalfEdge);
+		return &halfEdges.at(firstHalfEdge);
 	}
 	// Set the halfedge whose adjacent face is outerface.
 	inline void setFirstHalfEdge(HalfEdge *he) {
-		firstHalfEdge = he - &edges[0];
+		firstHalfEdge = he - &halfEdges[0];
 	}
 
 	std::vector<Vertex> vertices;
-	std::vector<HalfEdge> edges;
+	std::vector<HalfEdge> halfEdges;
 	std::vector<Face> faces;
 	std::vector<EdgeData> edgeDataContainer;
 
 	std::set<unsigned int> erasedVerticesIndices;
-	std::set<unsigned int> erasedEdgesIndices;
+	std::set<unsigned int> erasedHalfEdgesIndices;
 	std::set<unsigned int> erasedFacesIndices;
 	std::set<unsigned int> erasedEdgeDataContainerIndices;
 

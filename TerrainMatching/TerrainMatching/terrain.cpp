@@ -1,6 +1,7 @@
 #include "terrain.h"
 
 #include <iostream>
+#include <map>
 
 Terrain::Terrain()
 {
@@ -24,20 +25,27 @@ void Terrain::loadData(const char *filename)
     x_min = y_min = z_min = std::numeric_limits<double>::infinity();
     x_max = y_max = z_max = -std::numeric_limits<double>::infinity();
 
-    /* update min-max (data part) */
+    /* update vertexData */
     for (unsigned int i=0; i < wMesh.getNumVertices(); ++i)
     {
-        WavefrontMesh::Vertex* originVertex = wMesh.getVertex(i);
+        WavefrontMesh::Vertex* originVertex = wMesh.getVertex(i);		
         TerrainMesh::Vertex* targetVertex = mesh.getVertex(i);
+
+		// check isolated vertex.
+		if (originVertex->getIncidentEdge() == NULL) {
+			targetVertex->getData().isolated = true;
+		}
+
+		// copy vertex data.
         TerrainMesh::VertexData &targetVertexData = targetVertex->getData();
         targetVertexData.setCoordinates(originVertex->getData().position.x,
                                         originVertex->getData().position.y,
                                         originVertex->getData().position.z);
 
+		// update range.
         if (targetVertexData.p.x < x_min) x_min = targetVertexData.p.x;
         if (targetVertexData.p.y < y_min) y_min = targetVertexData.p.y;
         if (targetVertexData.p.z < z_min) z_min = targetVertexData.p.z;
-
         if (targetVertexData.p.x > x_max) x_max = targetVertexData.p.x;
         if (targetVertexData.p.y > y_max) y_max = targetVertexData.p.y;
         if (targetVertexData.p.z > z_max) z_max = targetVertexData.p.z;
@@ -99,7 +107,16 @@ void Terrain::loadData(std::vector<double> coordinates, std::vector<unsigned int
 //Arrangement Terrain::createGetXYArrangement()
 //{
 //}
+Terrain Terrain::createGetTrimTerrain(double x_min, double x_max, double y_min, double y_max)
+{
+	Terrain t;
+	std::map<unsigned int, unsigned int> mapVertices, mapHalfEdges, mapFaces; // maps *this to t
+	std::vector<TerrainMesh::Vertex> &vertices = mesh.getVertices();
+	std::vector<TerrainMesh::HalfEdge> &halfEdges = mesh.getHalfEdges();
+	std::vector<TerrainMesh::Face> &faces = mesh.getFaces();
+	
+	for (unsigned int i = 0; i < vertices.size(); ++i) {
+	}
 
-//Terrain Terrain::createGetTrimTerrain(double x_min, double x_max, double y_min, double y_max)
-//{
-//}
+	return t;
+}

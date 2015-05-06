@@ -35,9 +35,10 @@ class TerrainVertexData
 public:
     Point p; // coordinates
     VertexTrianglePair *VTpair; // paired one while translating.
+	bool isolated;
 
     TerrainVertexData()
-        : VTpair(NULL) {}
+        : VTpair(NULL), isolated(false) {}
 
     void setCoordinates(double _x, double _y, double _z) {p.x = _x; p.y = _y; p.z = _z;}
 };
@@ -92,7 +93,7 @@ public:
     typedef Mesh<TerrainVertexData, TerrainHalfEdgeData, TerrainFaceData> TerrainMesh;
 
     typedef TerrainMesh::EdgeIterator EdgeIterator;
-
+	
     typedef TerrainEdgeData EdgeData;
 
     /**
@@ -119,15 +120,15 @@ public:
 //     */
 //    Arrangement createGetXYArrangement();
 
-//    /**
-//     * @brief createGetTrimTerrain Make a trimmed terrain and return it.
-//     * @param x_min Minimum x-axis-ratio of the trim area
-//     * @param x_max Maximum x-axis-ratio of the trim area
-//     * @param y_min Minimum y-axis-ratio of the trim area
-//     * @param y_max Maximum y-axis-ratio of the trim area
-//     * @return The terrain trimmed by the specified rectangular region.
-//     */
-//    Terrain createGetTrimTerrain(double x_min, double x_max, double y_min, double y_max);
+    /**
+     * @brief createGetTrimTerrain Make a trimmed terrain and return it.
+     * @param x_min Minimum x-axis-ratio of the trim area
+     * @param x_max Maximum x-axis-ratio of the trim area
+     * @param y_min Minimum y-axis-ratio of the trim area
+     * @param y_max Maximum y-axis-ratio of the trim area
+     * @return The terrain trimmed by the specified rectangular region.
+     */
+    Terrain createGetTrimTerrain(double x_min, double x_max, double y_min, double y_max);
 
     unsigned int number_of_vertices() {return mesh.getNumVertices();}
     unsigned int number_of_halfedges() {return mesh.getNumHalfEdges();}

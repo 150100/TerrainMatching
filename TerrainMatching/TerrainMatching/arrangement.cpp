@@ -6,6 +6,8 @@
 	#define DEBUG
 #endif
 
+#define DEBUG
+
 SweepLine Arrangement::sweepLine;
 
 Arrangement *SweepLine::parent = NULL;
@@ -78,16 +80,22 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 	std::vector<TerrainFace> &faces_t2 = mesh_t2.getFaces();
 
 	// Allocate space for vectors
+	std::cerr << vertices_t1.size() << ' ' << halfEdges_t1.size() << ' ' << vertices_t2.size() << ' ' << halfEdges_t2.size() << '\n';
 	vertices.resize(2 * vertices_t1.size() * vertices_t2.size());
+	std::cerr << 2 * vertices_t1.size() * vertices_t2.size() << '\n';
 	halfEdges.resize(vertices_t2.size() * halfEdges_t1.size() + vertices_t1.size() * halfEdges_t2.size());
+	std::cerr << vertices_t2.size() * halfEdges_t1.size() + vertices_t1.size() * halfEdges_t2.size() << '\n';
 	edgeDataContainer.resize(halfEdges.size() / 2);
+	std::cerr << halfEdges.size() / 2 << '\n';
 	unsigned int vertices_first_idx = 0;
 	unsigned int halfEdges_first_idx = 0;
 
 	// nm^2 estimation of the overlay size.
+	std::cerr << vertices_t1.size() * vertices_t2.size() * vertices_t2.size() << '\n';
+	std::cerr << sizeof(Arrangement::HalfEdge) * vertices_t1.size() * vertices_t2.size() * vertices_t2.size() << '\n';
 	vertices.reserve(10 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
-	halfEdges.reserve(80 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
-	edgeDataContainer.reserve(40 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
+	halfEdges.reserve(40 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
+	edgeDataContainer.reserve(20 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
 
 	// Insert all copied (t1) with translation of -(vertex of t2).
 	unsigned int idx_ed = 0;

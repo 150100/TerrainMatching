@@ -128,7 +128,7 @@ public:
      * @param y_max Maximum y-axis-ratio of the trim area
      * @return The terrain trimmed by the specified rectangular region.
      */
-    Terrain createGetTrimTerrain(double x_min, double x_max, double y_min, double y_max);
+	void createGetTrimTerrain(double x_min, double x_max, double y_min, double y_max, Terrain *trimTerrain);
 
     unsigned int number_of_vertices() {return mesh.getNumVertices();}
     unsigned int number_of_halfedges() {return mesh.getNumHalfEdges();}

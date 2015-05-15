@@ -6,8 +6,8 @@
 Terrain::Terrain()
 {
     /* initialize members */
-    x_min = y_min = z_min = std::numeric_limits<double>::infinity();
-    x_max = y_max = z_max = -std::numeric_limits<double>::infinity();
+	x_min = y_min = z_min = edgeLength_min = std::numeric_limits<double>::infinity();
+	x_max = y_max = z_max = edgeLength_max = -std::numeric_limits<double>::infinity();
 }
 
 void Terrain::loadData(const char *filename)
@@ -22,10 +22,12 @@ void Terrain::loadData(const char *filename)
     DCELStream<WavefrontMesh>::copyDcelData(wMesh, mesh);
 
     /* initialize */
-    x_min = y_min = z_min = std::numeric_limits<double>::infinity();
-    x_max = y_max = z_max = -std::numeric_limits<double>::infinity();
+	x_min = y_min = z_min = std::numeric_limits<double>::infinity();
+	x_max = y_max = z_max = -std::numeric_limits<double>::infinity();
 
     /* update vertexData */
+	bool isolated_start = false;
+	unsigned int isolated_start_idx = -1;
     for (unsigned int i=0; i < wMesh.getNumVertices(); ++i)
     {
         WavefrontMesh::Vertex* originVertex = wMesh.getVertex(i);		
@@ -33,7 +35,13 @@ void Terrain::loadData(const char *filename)
 
 		// check isolated vertex.
 		if (originVertex->getIncidentEdge() == NULL) {
-			targetVertex->getData().isolated = true;
+			if (isolated_start == false) {
+				isolated_start_idx = i;
+				isolated_start = true;
+			}
+		}
+		else if (isolated_start) {
+			throw cpp::Exception("isolated vertex should be only on the end of the structure.");
 		}
 
 		// copy vertex data.
@@ -50,19 +58,42 @@ void Terrain::loadData(const char *filename)
         if (targetVertexData.p.y > y_max) y_max = targetVertexData.p.y;
         if (targetVertexData.p.z > z_max) z_max = targetVertexData.p.z;
     }
+
+	/* remove isolated vertices. */
+	if (isolated_start) {
+		auto &meshVertices = mesh.getVertices();
+		meshVertices.erase(meshVertices.begin() + isolated_start_idx, meshVertices.end());
+	}
 	
 	/* update edgeDataContainer */
 	edgeDataContainer.reserve(number_of_halfedges() / 2);
 
+	double edgeLength2_min(std::numeric_limits<double>::infinity()), edgeLength2_max(-std::numeric_limits<double>::infinity());
 	for (unsigned int i=0; i < number_of_halfedges(); ++i)
 	{
-		if (mesh.getHalfEdge(i)->getData().edgeData == NULL) {
+		TerrainMesh::HalfEdge *he = mesh.getHalfEdge(i);
+		if (he->getData().edgeData == NULL) {
+			// check zero-length edge.
+			if (he->getOrigin()->getData().p.x == he->getTwin()->getOrigin()->getData().p.x &&
+				he->getOrigin()->getData().p.y == he->getTwin()->getOrigin()->getData().p.y) {
+				throw cpp::Exception("There should not be a zero-length edge.");
+			}
+
 			EdgeData ed;
 			edgeDataContainer.push_back(ed);
-			mesh.getHalfEdge(i)->getData().edgeData = &edgeDataContainer.back();
-			mesh.getHalfEdge(i)->getTwin()->getData().edgeData = &edgeDataContainer.back();
+			he->getData().edgeData = &edgeDataContainer.back();
+			he->getTwin()->getData().edgeData = &edgeDataContainer.back();
+			
+			// update edgeLength range.
+			Point &p1 = he->getOrigin()->getData().p;
+			Point &p2 = he->getTwin()->getOrigin()->getData().p;
+			double length2 = pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2);
+			if (length2 < edgeLength2_min) edgeLength2_min = length2;
+			if (length2 > edgeLength2_max) edgeLength2_max = length2;
 		}
 	}
+	edgeLength_min = sqrt(edgeLength2_min);
+	edgeLength_max = sqrt(edgeLength2_max);
 
 	if (edgeDataContainer.size() != number_of_halfedges() / 2)
 		throw cpp::Exception("# of Edges is not (# of Halfedges)/2.");
@@ -118,15 +149,32 @@ void Terrain::loadData(std::vector<double> coordinates, std::vector<unsigned int
 	/* update edgeDataContainer */
 	edgeDataContainer.reserve(number_of_halfedges() / 2);
 
+	double edgeLength2_min(std::numeric_limits<double>::infinity()), edgeLength2_max(-std::numeric_limits<double>::infinity());
 	for (unsigned int i = 0; i < number_of_halfedges(); ++i)
 	{
-		if (mesh.getHalfEdge(i)->getData().edgeData == NULL) {
+		TerrainMesh::HalfEdge *he = mesh.getHalfEdge(i);
+		if (he->getData().edgeData == NULL) {
+			// check zero-length edge.
+			if (he->getOrigin()->getData().p.x == he->getTwin()->getOrigin()->getData().p.x &&
+				he->getOrigin()->getData().p.y == he->getTwin()->getOrigin()->getData().p.y) {
+				throw cpp::Exception("There should not be a zero-length edge.");
+			}
+
 			EdgeData ed;
 			edgeDataContainer.push_back(ed);
-			mesh.getHalfEdge(i)->getData().edgeData = &edgeDataContainer.back();
-			mesh.getHalfEdge(i)->getTwin()->getData().edgeData = &edgeDataContainer.back();
+			he->getData().edgeData = &edgeDataContainer.back();
+			he->getTwin()->getData().edgeData = &edgeDataContainer.back();
+
+			// update edgeLength range.
+			Point &p1 = he->getOrigin()->getData().p;
+			Point &p2 = he->getTwin()->getOrigin()->getData().p;
+			double length2 = pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2);
+			if (length2 < edgeLength2_min) edgeLength2_min = length2;
+			if (length2 > edgeLength2_max) edgeLength2_max = length2;
 		}
 	}
+	edgeLength_min = sqrt(edgeLength2_min);
+	edgeLength_max = sqrt(edgeLength2_max);
 
 	if (edgeDataContainer.size() != number_of_halfedges() / 2)
 		throw cpp::Exception("# of Edges is not (# of Halfedges)/2.");

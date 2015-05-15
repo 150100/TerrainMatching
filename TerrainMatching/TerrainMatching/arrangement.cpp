@@ -6,7 +6,7 @@
 	#define DEBUG
 #endif
 
-#define DEBUG
+//#define DEBUG
 
 SweepLine Arrangement::sweepLine;
 
@@ -16,6 +16,8 @@ Event *SweepLine::currentEvent = NULL;
 SweepLine::EdgeDataBBT SweepLine::edgeDataBBT;
 int SweepLine::eventCount = 0;
 bool SweepLine::firstEvent = true;
+double SweepLine::x_stepSize = 0;
+double SweepLine::y_stepSize = 0;
 
 template <class T>
 class Vector2
@@ -91,8 +93,8 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 	unsigned int halfEdges_first_idx = 0;
 
 	// nm^2 estimation of the overlay size.
-	std::cerr << vertices_t1.size() * vertices_t2.size() * vertices_t2.size() << '\n';
-	std::cerr << sizeof(Arrangement::HalfEdge) * vertices_t1.size() * vertices_t2.size() * vertices_t2.size() << '\n';
+	std::cerr << "nm^2 = " << vertices_t1.size() * vertices_t2.size() * vertices_t2.size() << '\n';
+	std::cerr << "size of nm^2 = " << sizeof(Arrangement::HalfEdge) * vertices_t1.size() * vertices_t2.size() * vertices_t2.size() << '\n';
 	vertices.reserve(10 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
 	halfEdges.reserve(40 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
 	edgeDataContainer.reserve(20 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
@@ -103,21 +105,12 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 	{
 		TerrainVertex &v_t2 = vertices_t2.at(i);
 
-		if (v_t2.getData().isolated) { // if isolated vertex, discard.
-			continue;
-		}
-
 		// copy vertex info
 		unsigned int isolatedVertexCount = 0;
 		for (unsigned int j=0; j < vertices_t1.size(); ++j)
 		{
 			Vertex &v = vertices.at(vertices_first_idx + j - isolatedVertexCount);
 			TerrainVertex &v_t1 = vertices_t1.at(j);
-
-			if (v_t1.getData().isolated) { // if isolated vertex, discard.
-				++isolatedVertexCount;
-				continue;
-			}
 
 			v.getData().x = v_t1.getData().p.x - v_t2.getData().p.x;
 			v.getData().y = v_t1.getData().p.y - v_t2.getData().p.y;
@@ -198,21 +191,12 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 	{
 		TerrainVertex &v_t1 = vertices_t1.at(i);
 
-		if (v_t1.getData().isolated) { // if isolated vertex, discard.
-			continue;
-		}
-
 		// copy vertex info
 		unsigned int isolatedVertexCount = 0;
 		for (unsigned int j=0; j < vertices_t2.size(); ++j)
 		{
 			Vertex &v = vertices.at(vertices_first_idx + j - isolatedVertexCount);
 			TerrainVertex &v_t2 = vertices_t2.at(j);
-
-			if (v_t2.getData().isolated) { // if isolated vertex, discard.
-				++isolatedVertexCount;
-				continue;
-			}
 
 			v.getData().x = v_t1.getData().p.x - v_t2.getData().p.x;
 			v.getData().y = v_t1.getData().p.y - v_t2.getData().p.y;
@@ -417,7 +401,7 @@ bool SweepLine::handleProperIntersectionEvent(Arrangement::EdgeData *ed1, Arrang
 }
 
 // ed2 was below ed1. ed2 will go up, and ed1 will go down relatively.
-// returns (ed1N, ed2N)
+// returns the intersection vertex
 Arrangement::Vertex * 
 SweepLine::updateDCELProperIntersection(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2, double int_x, double int_y)
 {
@@ -475,7 +459,7 @@ SweepLine::updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement:
 		(ed)-----¡Ü-----(edN)	+	¡Ü	  =		(ed)-------¡Ü-------(edN)
 									¦¢				 edNd  ¦¢  edd
 	*/
-
+	
 	// existing structure of ed
 	Arrangement::HalfEdge *edu = ed->halfEdge_up;
 	Arrangement::HalfEdge *edd = ed->halfEdge_down;
@@ -525,6 +509,8 @@ SweepLine::updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement:
 
 void SweepLine::updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangement::Vertex *v_del)
 {
+	if (v == v_del) return; // if two are the same point, discard the operation.
+
 	ArrangementVector vec_v(v->getData());
 	ArrangementVector vec_v_del(v_del->getData());
 
@@ -588,10 +574,6 @@ void SweepLine::updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangemen
 				// twin-edge handling (prev and next)
 				if (vec_he_prev > ArrangementVector(0, 0) && vec_he_next > ArrangementVector(0, 0)) // if prev and next have the forward direction, merge them as a twin-edge.
 					updateDCELTwinEdgeWithOneSharedVertex(he_prev, he_next);
-#ifdef DEBUG
-				if (vec_he_prev == ArrangementVector(0, 0) || vec_he_next == ArrangementVector(0, 0))
-					throw cpp::Exception("There should not be a zero-length edge.");
-#endif
 			}
 			else {
 				throw cpp::Exception("An edge should not be zero-length.");
@@ -606,8 +588,10 @@ void SweepLine::updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangemen
 				vec_he_next = ArrangementVector(he_next->getTwin()->getOrigin()->getData()) - vec_v;
 			}
 			else { // if insert, 
-				if (he_prev == he)
+				if (he_prev == he) {
+					throw cpp::Exception("Cannot be happened.");
 					continue; // filter same-source edges
+				}
 				
 				// link he to v between he_prev and he_next
 				he->setPrev(he_prev->getTwin());

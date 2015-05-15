@@ -38,7 +38,7 @@ public:
 	}
 
 	inline void print(std::ostream &os) {
-		os << std::setprecision(6) << '(' << x << ',' << y << ')';
+		os << '(' << x << ',' << y << ')';
 	}
 };
 
@@ -322,6 +322,7 @@ private:
 	static EdgeDataBBT edgeDataBBT;
 	static int eventCount;
 	static bool firstEvent;
+	static double x_stepSize, y_stepSize;
 
 	static EventQueueIterator events_insert(Arrangement::Vertex *v) {
 		EventQueueIterator it = events.insert(Event(v));

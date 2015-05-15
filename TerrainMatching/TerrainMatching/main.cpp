@@ -109,12 +109,18 @@ int main(int argc, char **argv)
     bool first = true;
 
     //
-    do {
-        //std::cin >> ch;
-        ++num;
-        if (num % 1000 == 0) std::cerr << "\n== Cell " << num << " ==" << std::endl;
-        //tss.printCSPlanes();
-        //std::cerr << ".........." << std::endl;
+	clock_t clock_IntervalStart = clock();
+	do {
+		//std::cin >> ch;
+		++num;
+		if (num % 1 == 0) {
+			clock_t clock_IntervalEnd = clock();
+			std::cerr << "\n== Cell " << num << " ==\n";
+			std::cerr << "Time elapsed : " << (double)(clock_IntervalEnd - clock_IntervalStart) / (double)CLOCKS_PER_SEC << '\n';
+			clock_IntervalStart = clock();
+			//tss.printCSPlanes();
+			//std::cerr << ".........." << std::endl;
+		}
 
         bool success = tss.solveLP(local_optimal);
 

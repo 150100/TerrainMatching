@@ -17,19 +17,17 @@ void TranslationSpaceSubdivision::init()
 	// test of he
 	if (he == NULL) throw cpp::Exception("There is no outer-face.");
 	if (he->getTwin()->getFace() == NULL) throw cpp::Exception("First face is NULL. (TSS::init())");
-	if (he->getFace() != arr.getOuterface()) throw cpp::Exception("Outer face is not NULL. (TSS::init())");
+	if (he->getFace() != arr.getOuterface()) throw cpp::Exception("Outer face is not outer. (TSS::init())");
 
     // initialize first cell
     update_CS(he);
+	he->getFace()->getData().state = Arrangement::FaceData::PASSED;
     m_he_stack.push(he);
     m_he_path.push(he);
 }
 
 TranslationSpaceSubdivision::DFSState TranslationSpaceSubdivision::advance()
 {
-//    char c;
-//    std::cin >> c;
-
     if (m_he_stack.empty()) throw cpp::Exception("TSS stack should not be empty.");
 	
     // previous target
@@ -46,7 +44,7 @@ TranslationSpaceSubdivision::DFSState TranslationSpaceSubdivision::advance()
     {
 		Arrangement::HalfEdge* next_he = eit.getNext();
 		Arrangement::Face* adj_f = next_he->getTwin()->getFace();
-		if (adj_f != NULL && adj_f->getData().state == Arrangement::FaceData::NOTPASSED)
+		if (adj_f->getData().state == Arrangement::FaceData::NOTPASSED)
             m_he_stack.push(next_he);
     }
 

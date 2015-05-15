@@ -298,6 +298,8 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 			}
 		}
 	}
+	if (faces.size() != number_of_edges() - number_of_vertices() + 2)
+		throw cpp::Exception("Face num not match.");
 }
 
 

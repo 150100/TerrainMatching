@@ -53,6 +53,7 @@ public:
 
     int getInsideNum() {return m_CS.inside_num;}
     void printCSPlanes() {m_CS.printPlanes();}
+	int numCSPlanes() { return m_CS.m_plane_list.size(); }
 };
 
 #endif // TRANSLATIONSPACESUBDIVISION_H

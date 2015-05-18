@@ -44,8 +44,10 @@ TranslationSpaceSubdivision::DFSState TranslationSpaceSubdivision::advance()
     {
 		Arrangement::HalfEdge* next_he = eit.getNext();
 		Arrangement::Face* adj_f = next_he->getTwin()->getFace();
-		if (adj_f->getData().state == Arrangement::FaceData::NOTPASSED)
-            m_he_stack.push(next_he);
+		if (adj_f->getData().state == Arrangement::FaceData::NOTPASSED) {
+			m_he_stack.push(next_he);
+			adj_f->getData().state = Arrangement::FaceData::CHECKED;
+		}
     }
 
 	// ending condition of DFS
@@ -153,15 +155,14 @@ void TranslationSpaceSubdivision::switch_EEpairs(TerrainHalfEdge *he, TerrainVer
 {
 	std::list<EdgeEdgePair *> &EEpair_list = he->getData().edgeData->EEpair_list;
 
-    std::vector<std::list<EdgeEdgePair *>::iterator> EEpair_it_v; // subset of EEpair_list related to v.
+    std::list<std::list<EdgeEdgePair *>::iterator> EEpair_it_v; // subset of EEpair_list related to v.
 
     // filter EEpair_list
     std::list<EdgeEdgePair *>::iterator eepit = EEpair_list.begin();
     while (eepit != EEpair_list.end())
     {
-        if ((*eepit)->edge1.containsVertex(v)) {
-            std::list<EdgeEdgePair *>::iterator eepit_copy;
-            EEpair_it_v.push_back(eepit_copy);
+		if ((*eepit)->edge1.containsVertex(v) || (*eepit)->edge2.containsVertex(v)) {
+            EEpair_it_v.push_back(eepit);
         }
 		++eepit;
     }
@@ -171,9 +172,10 @@ void TranslationSpaceSubdivision::switch_EEpairs(TerrainHalfEdge *he, TerrainVer
     while (eit_v.hasNext())
     {
         TerrainHalfEdge *cur_he = eit_v.getNext();
+		std::list<EdgeEdgePair *> &cur_EEpair_list = cur_he->getData().edgeData->EEpair_list;
 
         bool exist = false; // true if (cur_he, he) pair is already in EEpair_list.
-        std::vector<std::list<EdgeEdgePair *>::iterator>::iterator eepit_v = EEpair_it_v.begin();
+        std::list<std::list<EdgeEdgePair *>::iterator>::iterator eepit_v = EEpair_it_v.begin();
         while (eepit_v != EEpair_it_v.end())
         {
             if ((**eepit_v)->edge1.sameEdge(cur_he)) {
@@ -185,8 +187,10 @@ void TranslationSpaceSubdivision::switch_EEpairs(TerrainHalfEdge *he, TerrainVer
         }
 
         if (exist) {
+			m_CS.removePair(**eepit_v);
             EEpair_list.erase(*eepit_v);
             EEpair_it_v.erase(eepit_v);
+			cur_he->getData().edgeData->EEpair_list.erase(*eepit_v);
         }
         else {
             EdgeEdgePair *eepair = m_CS.insertPair(he, cur_he, he_is_from_patch);

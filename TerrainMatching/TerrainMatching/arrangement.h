@@ -56,7 +56,7 @@ public:
 class ArrangementFaceData
 {
 public:
-    enum TraverseState { PASSED, NOTPASSED }; // outer face is NULL
+	enum TraverseState { NOTPASSED, CHECKED, PASSED };
 
     TraverseState state; // information for DFS
 

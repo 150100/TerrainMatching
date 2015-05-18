@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 			std::cerr << "\n== Cell " << num << " ==\n";
 			std::cerr << "Time elapsed : " << (double)(clock_IntervalEnd - clock_IntervalStart) / (double)CLOCKS_PER_SEC << '\n';
 			clock_IntervalStart = clock();
-			//tss.printCSPlanes();
+			tss.printCSPlanes();
 			//std::cerr << ".........." << std::endl;
 		}
 

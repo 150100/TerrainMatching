@@ -178,7 +178,7 @@ void TranslationSpaceSubdivision::switch_EEpairs(TerrainHalfEdge *he, TerrainVer
         std::list<std::list<EdgeEdgePair *>::iterator>::iterator eepit_v = EEpair_it_v.begin();
         while (eepit_v != EEpair_it_v.end())
         {
-            if ((**eepit_v)->edge1.sameEdge(cur_he)) {
+			if ((**eepit_v)->edge1.sameEdge(cur_he) || (**eepit_v)->edge2.sameEdge(cur_he)) {
                 exist = true;
                 break;
             }
@@ -187,14 +187,25 @@ void TranslationSpaceSubdivision::switch_EEpairs(TerrainHalfEdge *he, TerrainVer
         }
 
         if (exist) {
-			m_CS.removePair(**eepit_v);
+			EdgeEdgePair *toBeRemoved = **eepit_v;
             EEpair_list.erase(*eepit_v);
             EEpair_it_v.erase(eepit_v);
-			cur_he->getData().edgeData->EEpair_list.erase(*eepit_v);
+			std::list<EdgeEdgePair *>::iterator it_cur_EEpair_list = cur_EEpair_list.begin();
+			while (it_cur_EEpair_list != cur_EEpair_list.end())
+			{
+				if ((*it_cur_EEpair_list)->edge1.sameEdge(he) || (*it_cur_EEpair_list)->edge2.sameEdge(he)) {
+					cur_EEpair_list.erase(it_cur_EEpair_list);
+					break;
+				}
+				else
+					++it_cur_EEpair_list;
+			}
+			m_CS.removePair(toBeRemoved);
         }
         else {
             EdgeEdgePair *eepair = m_CS.insertPair(he, cur_he, he_is_from_patch);
             EEpair_list.push_back(eepair);
+			cur_EEpair_list.push_back(eepair);
         }
     }
 }

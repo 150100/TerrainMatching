@@ -298,8 +298,12 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 			}
 		}
 	}
-	if (faces.size() != number_of_edges() - number_of_vertices() + 2)
+	if (faces.size() != number_of_edges() - number_of_vertices() + 2) {
+		std::cerr << "# of edges = " << number_of_edges() << '\n';
+		std::cerr << "# of vertices = " << number_of_vertices() << '\n';
+		std::cerr << "# of faces = " << number_of_faces() << ' ' << faces.size() << '\n';
 		throw cpp::Exception("Face num not match.");
+	}
 }
 
 

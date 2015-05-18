@@ -56,7 +56,6 @@ class EdgeEdgePair : public CombinatorialPair
 public:
     typedef Terrain::TerrainMesh::Vertex TerrainVertex;
     typedef Terrain::TerrainMesh::HalfEdge TerrainHalfEdge;
-	typedef Terrain::EdgeData TerrainEdgeData;
 
     class Edge
     {
@@ -68,16 +67,18 @@ public:
         TerrainHalfEdge *he;
 
         bool sameEdge(Edge &_e) {
-            return  (_e.he->getOrigin() == he->getOrigin()
-                     && _e.he->getNext()->getOrigin() == he->getNext()->getOrigin())
-                 || (_e.he->getOrigin() == he->getNext()->getOrigin()
-                     && _e.he->getNext()->getOrigin() == he->getOrigin());
+			return _e.he->getData().edgeData == he->getData().edgeData;
+            //return  (_e.he->getOrigin() == he->getOrigin()
+            //         && _e.he->getNext()->getOrigin() == he->getNext()->getOrigin())
+            //     || (_e.he->getOrigin() == he->getNext()->getOrigin()
+            //         && _e.he->getNext()->getOrigin() == he->getOrigin());
         }
         bool sameEdge(TerrainHalfEdge *_he) {
-            return  (_he->getOrigin() == he->getOrigin()
-                     && _he->getNext()->getOrigin() == he->getNext()->getOrigin())
-                 || (_he->getOrigin() == he->getNext()->getOrigin()
-                     && _he->getNext()->getOrigin() == he->getOrigin());
+			return _he->getData().edgeData == he->getData().edgeData;
+            //return  (_he->getOrigin() == he->getOrigin()
+            //         && _he->getNext()->getOrigin() == he->getNext()->getOrigin())
+            //     || (_he->getOrigin() == he->getNext()->getOrigin()
+            //         && _he->getNext()->getOrigin() == he->getOrigin());
         }
         bool containsVertex(TerrainVertex *_v) {
             return he->getOrigin() == _v || he->getNext()->getOrigin() == _v;
@@ -137,9 +138,9 @@ public:
         VertexTrianglePair *p_pair = new VertexTrianglePair(v, tri, tri_is_from_patch);
         p_pair->insertPlane(m_plane_list);
 
-        std::cout << "CS::insertPair(vh,fh,ck). ";
-        p_pair->print();
-        std::cout << std::endl;
+        //std::cout << "CS::insertPair(vh,fh,ck). ";
+        //p_pair->print();
+        //std::cout << std::endl;
 
         return p_pair;
     }
@@ -148,9 +149,9 @@ public:
         EdgeEdgePair *p_pair = new EdgeEdgePair(he1, he2, he1_is_from_patch);
         p_pair->insertPlane(m_plane_list);
 
-        std::cout << "CS::insertPair(e1,e2,ck). ";
-        p_pair->print();
-        std::cout << std::endl;
+        //std::cout << "CS::insertPair(e1,e2,ck). ";
+        //p_pair->print();
+        //std::cout << std::endl;
 
         return p_pair;
     }
@@ -159,9 +160,9 @@ public:
 
         p_pair->removePlane(m_plane_list);
 
-        std::cout << "CS::removePair(p_pair). ";
-        p_pair->print();
-        std::cout << std::endl;
+        //std::cout << "CS::removePair(p_pair). ";
+        //p_pair->print();
+        //std::cout << std::endl;
 
         delete p_pair;
     }

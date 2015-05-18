@@ -107,20 +107,21 @@ int main(int argc, char **argv)
     BasisResult global_optimal(Point(0,0,0),std::numeric_limits<double>::infinity()),
                 local_optimal(Point(0,0,0),std::numeric_limits<double>::infinity());
     bool first = true;
+	clock_t clock_TraversalStart = clock();
 
     //
 	clock_t clock_IntervalStart = clock();
 	do {
 		//std::cin >> ch;
 		++num;
-		if (num % 1 == 0) {
-			clock_t clock_IntervalEnd = clock();
-			std::cerr << "\n== Cell " << num << " ==\n";
-			std::cerr << "Time elapsed : " << (double)(clock_IntervalEnd - clock_IntervalStart) / (double)CLOCKS_PER_SEC << '\n';
-			clock_IntervalStart = clock();
-			tss.printCSPlanes();
-			//std::cerr << ".........." << std::endl;
-		}
+		//if (num % 1000 == 0) {
+		//	clock_t clock_IntervalEnd = clock();
+		//	std::cerr << "\n== Cell " << num << " ==\n";
+		//	std::cerr << "Time elapsed : " << (double)(clock_IntervalEnd - clock_IntervalStart) / (double)CLOCKS_PER_SEC << '\n';
+		//	clock_IntervalStart = clock();
+		//	//tss.printCSPlanes();
+		//	//std::cerr << ".........." << std::endl;
+		//}
 
         bool success = tss.solveLP(local_optimal);
 
@@ -148,15 +149,18 @@ int main(int argc, char **argv)
     }
     while (tss.advance() == tss.DFS_ADVANCED);
 
+	clock_t clock_TraversalEnd = clock();
+
 	// result
-    std::cerr << "the number of cells traversed = " << num << std::endl;
+    std::cerr << "the number of cells traversed = " << num << '\n';
 
     std::cerr << "\nGlobal Solution: ("
                 << global_optimal.location.x << ","
                 << global_optimal.location.y << ","
                 << global_optimal.location.z << ") dist="
                 << global_optimal.distance << std::endl;
-    std::cerr << "Inside number: " << tss.getInsideNum() << std::endl;
+	std::cerr << "Inside number: " << tss.getInsideNum() << '\n';
+	std::cerr << "Traversal time elapsed : " << (double)(clock_TraversalEnd - clock_TraversalStart) / (double)CLOCKS_PER_SEC << '\n';
 
 	std::cin.sync();
 	std::cin.get();

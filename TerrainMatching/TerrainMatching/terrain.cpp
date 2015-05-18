@@ -205,9 +205,9 @@ void Terrain::createGetTrimTerrain(double x_min, double x_max, double y_min, dou
 		Point &v_p = v.getData().p;
 		if (x_min_coord <= v_p.x && v_p.x <= x_max_coord &&
 			y_min_coord <= v_p.y && v_p.y <= y_max_coord) { // if a vertex is in the range, insert the vertex into the trim-terrain.
-			coordinates.push_back(v_p.x);
-			coordinates.push_back(v_p.y);
-			coordinates.push_back(v_p.z);
+			coordinates.push_back(v_p.x + 0.3);
+			coordinates.push_back(v_p.y - 0.5);
+			coordinates.push_back(v_p.z + 0.1);
 			map_inserted_vertices[i] = t_idx++;
 		}
 	}

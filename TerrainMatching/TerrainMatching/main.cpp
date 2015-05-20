@@ -11,7 +11,8 @@ int main(int argc, char **argv)
     char ch;
 
     // ------------- Terrain setting ---------------
-    std::cerr << std::setprecision(std::numeric_limits<double>::digits10);
+    //std::cerr << std::setprecision(std::numeric_limits<double>::digits10);
+	std::cerr << std::setprecision(6);
     std::cerr << "Domain loading..." << std::endl;
 
     // two vectors to hold point coordinates and triangle vertex indices
@@ -42,9 +43,7 @@ int main(int argc, char **argv)
     T.loadData(Tname.c_str());
 
     std::cerr << "Domain information" << std::endl;
-    std::cerr << "V = " << T.number_of_vertices() << std::endl;
-    std::cerr << "E = " << T.number_of_edges() << std::endl;
-    std::cerr << "F = " << T.number_of_faces() << std::endl;
+	T.print(std::cerr);
 
 
     // ------------- Patch setting ---------------
@@ -63,9 +62,7 @@ int main(int argc, char **argv)
         P.loadData(Pname.c_str());
 
     std::cerr << "Patch information" << std::endl;
-    std::cerr << "V = " << P.number_of_vertices() << std::endl;
-    std::cerr << "E = " << P.number_of_edges() << std::endl;
-    std::cerr << "F = " << P.number_of_faces() << std::endl;
+	P.print(std::cerr);
 
 
 

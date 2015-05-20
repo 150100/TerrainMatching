@@ -93,7 +93,7 @@ void WavefrontObjImporter<MeshT>::import( std::list<Vector3f>& vertices, unsigne
         {
             //std::cout << a << ' ' << b << ' ' << c << std::endl;
             mesh.checkFace(fid);
-            mesh.checkAllFaces();
+            //mesh.checkAllFaces();
         }
     }
 

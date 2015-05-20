@@ -134,12 +134,21 @@ public:
 	unsigned int number_of_edges() {return edgeDataContainer.size();}
     unsigned int number_of_faces() {return mesh.getNumFaces();}
 
-    TerrainMesh& getMesh() {return mesh;}
+    TerrainMesh& getMesh() { return mesh; }
 	std::vector<EdgeData>& getEdgeDataContainer() { return edgeDataContainer; }
 
-private:
-    double x_min, x_max, y_min, y_max, z_min, z_max;
+	void print(std::ostream &os) {
+		std::cerr << "V = " << number_of_vertices() << std::endl;
+		std::cerr << "E = " << number_of_edges() << std::endl;
+		std::cerr << "F = " << number_of_faces() << std::endl;
+		std::cerr << "range = ([" << x_min << ',' << x_max << "], [" << y_min << ',' << y_max << "], [" << z_min << ',' << z_max << "])\n";
+		std::cerr << "edge lengths = [" << edgeLength_min << ',' << edgeLength_max << "]\n";
+	}
+
+	double x_min, x_max, y_min, y_max, z_min, z_max;
 	double edgeLength_min, edgeLength_max;
+
+private:
     TerrainMesh mesh;
 	std::vector<EdgeData> edgeDataContainer;
 };

@@ -279,6 +279,9 @@ public:
 	std::set<unsigned int> erasedFacesIndices;
 	std::set<unsigned int> erasedEdgeDataContainerIndices;
 
+	double x_min, x_max, y_min, y_max;
+	double edgeLength_max;
+
 private:
 	unsigned int firstHalfEdge;
 	unsigned int outerface;

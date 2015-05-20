@@ -40,7 +40,7 @@ void Terrain::loadData(const char *filename)
 				isolated_start = true;
 			}
 		}
-		else if (isolated_start) {
+		if (isolated_start) {
 			throw cpp::Exception("isolated vertex should be only on the end of the structure.");
 		}
 

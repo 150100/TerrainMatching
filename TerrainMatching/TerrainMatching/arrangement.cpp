@@ -71,6 +71,13 @@ bool arrVertexCompare(Arrangement::Vertex &v1, Arrangement::Vertex &v2)
 
 Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 {
+	// Compute Range
+	x_min = t1->x_min - t2->x_max;
+	x_max = t1->x_max - t2->x_min;
+	y_min = t1->y_min - t2->y_max;
+	y_max = t1->y_max - t2->y_min;
+	edgeLength_max = std::max(t1->edgeLength_max, t2->edgeLength_max);
+
 	// Datastructure of t1 & t2.
     TerrainMesh &mesh_t1 = t1->getMesh();
     TerrainMesh &mesh_t2 = t2->getMesh();
@@ -84,20 +91,15 @@ Arrangement::Arrangement(Terrain *t1, Terrain *t2)
 	// Allocate space for vectors
 	std::cerr << vertices_t1.size() << ' ' << halfEdges_t1.size() << ' ' << vertices_t2.size() << ' ' << halfEdges_t2.size() << '\n';
 	vertices.resize(2 * vertices_t1.size() * vertices_t2.size());
-	std::cerr << 2 * vertices_t1.size() * vertices_t2.size() << '\n';
 	halfEdges.resize(vertices_t2.size() * halfEdges_t1.size() + vertices_t1.size() * halfEdges_t2.size());
-	std::cerr << vertices_t2.size() * halfEdges_t1.size() + vertices_t1.size() * halfEdges_t2.size() << '\n';
 	edgeDataContainer.resize(halfEdges.size() / 2);
-	std::cerr << halfEdges.size() / 2 << '\n';
 	unsigned int vertices_first_idx = 0;
 	unsigned int halfEdges_first_idx = 0;
 
-	// nm^2 estimation of the overlay size.
-	std::cerr << "nm^2 = " << vertices_t1.size() * vertices_t2.size() * vertices_t2.size() << '\n';
-	std::cerr << "size of nm^2 = " << sizeof(Arrangement::HalfEdge) * vertices_t1.size() * vertices_t2.size() * vertices_t2.size() << '\n';
-	vertices.reserve(10 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
-	halfEdges.reserve(40 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
-	edgeDataContainer.reserve(20 * vertices_t1.size() * vertices_t2.size() * vertices_t2.size());
+	// complexity estimation of inner-window.
+	vertices.reserve(2000);
+	halfEdges.reserve(4000);
+	edgeDataContainer.reserve(2000);
 
 	// Insert all copied (t1) with translation of -(vertex of t2).
 	unsigned int idx_ed = 0;

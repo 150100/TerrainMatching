@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <map>
+#include <algorithm>
 
 Terrain::Terrain()
 {
@@ -31,7 +32,7 @@ void Terrain::loadData(const char *filename)
     for (unsigned int i=0; i < wMesh.getNumVertices(); ++i)
     {
         WavefrontMesh::Vertex* originVertex = wMesh.getVertex(i);		
-        TerrainMesh::Vertex* targetVertex = mesh.getVertex(i);
+        Vertex* targetVertex = mesh.getVertex(i);
 
 		// check isolated vertex.
 		if (originVertex->getIncidentEdge() == NULL) {
@@ -45,7 +46,7 @@ void Terrain::loadData(const char *filename)
 		}
 
 		// copy vertex data.
-        TerrainMesh::VertexData &targetVertexData = targetVertex->getData();
+        VertexData &targetVertexData = targetVertex->getData();
         targetVertexData.setCoordinates(originVertex->getData().position.x,
                                         originVertex->getData().position.y,
                                         originVertex->getData().position.z);
@@ -71,7 +72,7 @@ void Terrain::loadData(const char *filename)
 	double edgeLength2_min(std::numeric_limits<double>::infinity()), edgeLength2_max(-std::numeric_limits<double>::infinity());
 	for (unsigned int i=0; i < number_of_halfedges(); ++i)
 	{
-		TerrainMesh::HalfEdge *he = mesh.getHalfEdge(i);
+		HalfEdge *he = mesh.getHalfEdge(i);
 		if (he->getData().edgeData == NULL) {
 			// check zero-length edge.
 			if (he->getOrigin()->getData().p.x == he->getTwin()->getOrigin()->getData().p.x &&
@@ -101,9 +102,9 @@ void Terrain::loadData(const char *filename)
 
 void Terrain::loadData(std::vector<double> coordinates, std::vector<unsigned int> triangles)
 {
-    std::vector<TerrainMesh::Vertex>& vertices = mesh.getVertices();
-    std::vector<TerrainMesh::HalfEdge>& halfEdges = mesh.getHalfEdges();
-    std::vector<TerrainMesh::Face>& faces = mesh.getFaces();
+    std::vector<Vertex>& vertices = mesh.getVertices();
+    std::vector<HalfEdge>& halfEdges = mesh.getHalfEdges();
+    std::vector<Face>& faces = mesh.getFaces();
 
     /* coords and tris should be triples */
     if (coordinates.size() % 3 != 0)
@@ -152,7 +153,7 @@ void Terrain::loadData(std::vector<double> coordinates, std::vector<unsigned int
 	double edgeLength2_min(std::numeric_limits<double>::infinity()), edgeLength2_max(-std::numeric_limits<double>::infinity());
 	for (unsigned int i = 0; i < number_of_halfedges(); ++i)
 	{
-		TerrainMesh::HalfEdge *he = mesh.getHalfEdge(i);
+		HalfEdge *he = mesh.getHalfEdge(i);
 		if (he->getData().edgeData == NULL) {
 			// check zero-length edge.
 			if (he->getOrigin()->getData().p.x == he->getTwin()->getOrigin()->getData().p.x &&
@@ -180,14 +181,11 @@ void Terrain::loadData(std::vector<double> coordinates, std::vector<unsigned int
 		throw cpp::Exception("# of Edges is not (# of Halfedges)/2.");
 }
 
-//Arrangement Terrain::createGetXYArrangement()
-//{
-//}
 void Terrain::createGetTrimTerrain(double x_min, double x_max, double y_min, double y_max, Terrain *trimTerrain)
 {
-	std::vector<TerrainMesh::Vertex> &vertices = mesh.getVertices();
-	std::vector<TerrainMesh::HalfEdge> &halfEdges = mesh.getHalfEdges();
-	std::vector<TerrainMesh::Face> &faces = mesh.getFaces();
+	std::vector<Vertex> &vertices = mesh.getVertices();
+	std::vector<HalfEdge> &halfEdges = mesh.getHalfEdges();
+	std::vector<Face> &faces = mesh.getFaces();
 
 	double x_min_coord = (this->x_max - this->x_min) * x_min + this->x_min;
 	double x_max_coord = (this->x_max - this->x_min) * x_max + this->x_min;
@@ -201,7 +199,7 @@ void Terrain::createGetTrimTerrain(double x_min, double x_max, double y_min, dou
 	
 	unsigned int t_idx = 0;
 	for (unsigned int i = 0; i < vertices.size(); ++i) { // search all the vertices
-		TerrainMesh::Vertex &v = vertices.at(i);
+		Vertex &v = vertices.at(i);
 		Point &v_p = v.getData().p;
 		if (x_min_coord <= v_p.x && v_p.x <= x_max_coord &&
 			y_min_coord <= v_p.y && v_p.y <= y_max_coord) { // if a vertex is in the range, insert the vertex into the trim-terrain.
@@ -213,11 +211,11 @@ void Terrain::createGetTrimTerrain(double x_min, double x_max, double y_min, dou
 	}
 
 	for (unsigned int i = 0; i < faces.size(); ++i) { // search all the faces
-		TerrainMesh::Face &f = faces.at(i);
+		Face &f = faces.at(i);
 		unsigned int v1, v2, v3;
-		TerrainMesh::HalfEdge *he = f.getBoundary();
+		HalfEdge *he = f.getBoundary();
 #ifdef _DEBUG
-		TerrainMesh::HalfEdge *he_first = he;
+		HalfEdge *he_first = he;
 #endif
 		v1 = mesh.getVertexId(he->getOrigin());
 		he = he->getNext();
@@ -239,4 +237,64 @@ void Terrain::createGetTrimTerrain(double x_min, double x_max, double y_min, dou
 	}
 
 	trimTerrain->loadData(coordinates, triangles);
+}
+
+void Terrain::sortVerticesAndUpdate()
+{
+	std::vector<Vertex> &vertices = mesh.getVertices();
+	std::vector<HalfEdge> &halfEdges = mesh.getHalfEdges();
+
+	std::vector<Vertex> vertices_sorted = vertices;
+	std::sort(vertices_sorted.begin(), vertices_sorted.end(), terrainVertexCompare);
+
+	for (unsigned i = 0; i < halfEdges.size(); ++i) {
+		HalfEdge &he = halfEdges.at(i);
+		Vertex &v = *(he.getOrigin());
+		std::vector<Vertex>::iterator it = std::lower_bound(vertices_sorted.begin(), vertices_sorted.end(), v, terrainVertexCompare);
+		he.setOrigin(&vertices[0] + (it._Ptr - &vertices_sorted[0]));
+	}
+	
+	vertices = vertices_sorted;
+}
+
+void TerrainWithGrids::makeGrids(double _gridStepSize)
+{
+	gridStepSize = _gridStepSize;
+	gridSizeX = std::ceil((x_max - x_min) / gridStepSize);
+	gridSizeY = std::ceil((y_max - y_min) / gridStepSize);
+
+	// allocate memory
+	grids = new std::vector<Vertex *> *[gridSizeX];
+	for (unsigned int i = 0; i < gridSizeX; ++i) {
+		grids[i] = new std::vector<Vertex *>[gridSizeY];
+	}
+
+	// distribute all vertices to grids
+	for (unsigned int i = 0; i < mesh.getNumVertices(); ++i) {
+		Vertex *v = mesh.getVertex(i);
+		Point &p = v->getData().p;
+
+		unsigned int grids_x = std::floor((p.x - x_min) / gridStepSize);
+		if (grids_x == gridSizeX) --grids_x; // handling the boundary due to floor function.
+		unsigned int grids_y = std::floor((p.x - x_min) / gridStepSize);
+		if (grids_y == gridSizeY) --grids_y; // handling the boundary due to floor function.
+
+		grids[grids_x][grids_y].push_back(v);
+	}
+
+	gridIsMade = true;
+}
+
+void TerrainWithGrids::appendVerticesInRange(double rangeX_min, double rangeX_max, double rangeY_min, double rangeY_max, std::vector<Vertex *> *verticesInRange)
+{
+	unsigned int gridX_min = std::max((unsigned int)std::floor((rangeX_min - x_min) / gridStepSize), 0u);
+	unsigned int gridX_max = std::min((unsigned int)std::ceil((rangeX_max - x_min) / gridStepSize), gridSizeX);
+	unsigned int gridY_min = std::max((unsigned int)std::floor((rangeY_min - y_min) / gridStepSize), 0u);
+	unsigned int gridY_max = std::min((unsigned int)std::ceil((rangeY_max - y_min) / gridStepSize), gridSizeY);
+
+	for (unsigned int gridX = gridX_min; gridX < gridX_max; ++gridX) {
+		for (unsigned int gridY = gridY_min; gridY < gridY_max; ++gridY) {
+			verticesInRange->insert(verticesInRange->end(), grids[gridX][gridY].begin(), grids[gridX][gridY].end());
+		}
+	}
 }

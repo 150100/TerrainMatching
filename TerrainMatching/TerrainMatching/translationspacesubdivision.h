@@ -9,6 +9,7 @@
 #include "combinatorialstructure.h"
 #include "terrain.h"
 
+enum DFSState { DFS_ADVANCED, DFS_END, DFS_FAILED };
 
 class TranslationSpaceSubdivision
 {
@@ -36,24 +37,38 @@ class TranslationSpaceSubdivision
 	void update_CS(Arrangement::HalfEdge* he);
 	void update_CS(Arrangement::EdgeData::Source &ex_data);
 
-public: 
-    enum DFSState { DFS_ADVANCED, DFS_END, DFS_FAILED };
-
+public:
+	// Constructor. Make sure that t1 and t2 are sored.
     TranslationSpaceSubdivision(Terrain *_t1, Terrain *_t2);
 
-	Arrangement arr; // arrangement
-    Terrain *t1; // domain
-    Terrain *t2; // patch
+	// arrangement
+	Arrangement arr; 
 
+	// domain
+    Terrain *t1; 
+
+	// patch
+    Terrain *t2; 
+
+	// Initialization function. Call whenever a new arrangement structure is made.
     void init();
 
-    DFSState advance();
+	// Go to next cell through DFS.
+    DFSState advanceDFS();
 
+	// Go to next grid-cell of the arrangement. It makes a new arrangement structure.
+	inline GridCellSearchState advanceGridCell() { 
+		GridCellSearchState state = arr.advanceGridCell(); 
+		init(); 
+		return state; 
+	}
+
+	// Solve LP-type problem to get an optimal solution under the current arrangement.
     bool solveLP(BasisResult &b);
 
-    int getInsideNum() {return m_CS.inside_num;}
-    void printCSPlanes() {m_CS.printPlanes();}
-	int numCSPlanes() { return m_CS.m_plane_list.size(); }
+    inline int getInsideNum() {return m_CS.inside_num;}
+    inline void printCSPlanes() { m_CS.printPlanes(); }
+	inline int numCSPlanes() { return m_CS.m_plane_list.size(); }
 };
 
 #endif // TRANSLATIONSPACESUBDIVISION_H

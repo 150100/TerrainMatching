@@ -26,7 +26,7 @@ void TranslationSpaceSubdivision::init()
     m_he_path.push(he);
 }
 
-TranslationSpaceSubdivision::DFSState TranslationSpaceSubdivision::advance()
+DFSState TranslationSpaceSubdivision::advanceDFS()
 {
     if (m_he_stack.empty()) throw cpp::Exception("TSS stack should not be empty.");
 	

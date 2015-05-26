@@ -24,6 +24,8 @@ class SweepLine;
 class ArrangementVertexData
 {
 public:
+	typedef Terrain::TerrainMesh::Vertex TerrainVertex;
+
     double x,y; // coordinates
 	std::multiset<Event, std::greater<Event>>::iterator it_eventQueue;
 
@@ -106,6 +108,8 @@ public:
 
 ///
 
+enum GridCellSearchState { GridCellSearch_ADVANCED, GridCellSearch_END, GridCellSearch_FAILED };
+
 class Arrangement
 {
 public:
@@ -129,15 +133,69 @@ public:
 	typedef FaceT<VertexData, HalfEdgeData, FaceData> Face;
 	typedef EdgeIteratorT<VertexData, HalfEdgeData, FaceData> EdgeIterator;
 
-    Arrangement(Terrain *t1, Terrain *t2);
+	// Data structure
+	std::vector<Vertex> vertices;
+	std::vector<HalfEdge> halfEdges;
+	std::vector<Face> faces;
+	std::vector<EdgeData> edgeDataContainer;
 
-	~Arrangement() {}
-	
+	// Erased containers
+	std::set<unsigned int> erasedVerticesIndices;
+	std::set<unsigned int> erasedHalfEdgesIndices;
+	std::set<unsigned int> erasedFacesIndices;
+	std::set<unsigned int> erasedEdgeDataContainerIndices;
+
+	// Parent terrains
+	TerrainWithGrids *t1, *t2;
+
+	// Total arrangement information
+	double x_min, x_max, y_min, y_max;
+	unsigned x_gridSize, y_gridSize;
+	double x_gridStepSize, y_gridStepSize;
+
+	// Window information
+	unsigned cur_x_grid, cur_y_grid;
+	double cur_x_min, cur_x_max, cur_y_min, cur_y_max;
+
+	// Constructor. Make sure the grids are made.
+    Arrangement(TerrainWithGrids *_t1, TerrainWithGrids *_t2);
+
+	// Advance to the next grid cell
+	GridCellSearchState advanceGridCell();
+
+	// Get arrangement of existing disconnected structure
+	void makeArrangement();
+
+	// Get the number of elements
 	inline unsigned int number_of_vertices() { return vertices.size() - erasedVerticesIndices.size(); }
 	inline unsigned int number_of_halfedges() { return halfEdges.size() - erasedHalfEdgesIndices.size(); }
 	inline unsigned int number_of_edges() { return edgeDataContainer.size() - erasedEdgeDataContainerIndices.size(); }
 	inline unsigned int number_of_faces() { return faces.size() - erasedFacesIndices.size(); }
 
+	// Get the outerface.
+	inline Face* getOuterface() {
+		return &faces.at(outerface);
+	}
+	// Set the outerface. (Set firstHalfEdge first.)
+	inline void setOuterface(Face *f) {
+		outerface = f - &faces[0];
+#ifdef _DEBUG
+		if (&faces[outerface] != halfEdges[firstHalfEdge].getFace())
+			throw cpp::Exception("Outerface should be an adjacent face of firstHalfEdge.");
+#endif
+	}
+	// Get a halfedge whose adjacent face is outerface.
+	inline HalfEdge* getFirstHalfEdge() {
+		return &halfEdges.at(firstHalfEdge);
+	}
+	// Set the halfedge whose adjacent face is outerface.
+	inline void setFirstHalfEdge(HalfEdge *he) {
+		firstHalfEdge = he - &halfEdges[0];
+	}
+	// Test emptiness
+	inline bool isEmpty() { return vertices.empty(); }
+
+	// Maintaining data structure
 	inline Vertex* createVertex()
 	{
 		if (erasedVerticesIndices.empty()) {
@@ -248,55 +306,24 @@ public:
 			erasedEdgeDataContainerIndices.insert(id);
 	}
 
-	// Get the outerface.
-	inline Face* getOuterface() {
-		return &faces.at(outerface);
-	}
-	// Set the outerface. (Set firstHalfEdge first.)
-	inline void setOuterface(Face *f) {
-		outerface = f - &faces[0];
-#ifdef _DEBUG
-		if (&faces[outerface] != halfEdges[firstHalfEdge].getFace())
-			throw cpp::Exception("Outerface should be an adjacent face of firstHalfEdge.");
-#endif
-	}
-	// Get a halfedge whose adjacent face is outerface.
-	inline HalfEdge* getFirstHalfEdge() {
-		return &halfEdges.at(firstHalfEdge);
-	}
-	// Set the halfedge whose adjacent face is outerface.
-	inline void setFirstHalfEdge(HalfEdge *he) {
-		firstHalfEdge = he - &halfEdges[0];
-	}
-
-	std::vector<Vertex> vertices;
-	std::vector<HalfEdge> halfEdges;
-	std::vector<Face> faces;
-	std::vector<EdgeData> edgeDataContainer;
-
-	std::set<unsigned int> erasedVerticesIndices;
-	std::set<unsigned int> erasedHalfEdgesIndices;
-	std::set<unsigned int> erasedFacesIndices;
-	std::set<unsigned int> erasedEdgeDataContainerIndices;
-
-	double x_min, x_max, y_min, y_max;
-	double edgeLength_max;
-
 private:
 	unsigned int firstHalfEdge;
 	unsigned int outerface;
 	static SweepLine sweepLine;
+
 };
 
 // Sweepline event point.
 class Event
 {
 public:
-	Arrangement::Vertex *v;
+	typedef Arrangement::Vertex ArrangementVertex;
+
+	ArrangementVertex *v;
 	double x, y;
 
 	Event() {}
-	Event(Arrangement::Vertex *_v) {
+	Event(ArrangementVertex *_v) {
 		v = _v;
 		x = v->getData().x;
 		y = v->getData().y;
@@ -313,10 +340,15 @@ public:
 class SweepLine
 {
 public:
+	typedef Arrangement::Vertex ArrangementVertex;
+	typedef Arrangement::HalfEdge ArrangementHalfEdge;
+	typedef Arrangement::Face ArrangementFace;
+	typedef Arrangement::EdgeData ArrangementEdgeData;
+
 	typedef std::multiset<Event, std::less<Event>> EventQueue;
 	typedef std::multiset<Event, std::less<Event>>::iterator EventQueueIterator;
-	typedef std::multiset<Arrangement::EdgeData *, ArrangementEdgeDataCompare> EdgeDataBBT;
-	typedef std::multiset<Arrangement::EdgeData *, ArrangementEdgeDataCompare>::iterator EdgeDataBBTIterator;
+	typedef std::multiset<ArrangementEdgeData *, ArrangementEdgeDataCompare> EdgeDataBBT;
+	typedef std::multiset<ArrangementEdgeData *, ArrangementEdgeDataCompare>::iterator EdgeDataBBTIterator;
 
 private:
 	static Arrangement *parent;
@@ -327,12 +359,12 @@ private:
 	static bool firstEvent;
 	static double x_stepSize, y_stepSize;
 
-	static EventQueueIterator events_insert(Arrangement::Vertex *v) {
+	static EventQueueIterator events_insert(ArrangementVertex *v) {
 		EventQueueIterator it = events.insert(Event(v));
 		v->getData().it_eventQueue = it;
 		return it;
 	}
-	static EventQueueIterator events_erase(Arrangement::Vertex *v) {
+	static EventQueueIterator events_erase(ArrangementVertex *v) {
 		EventQueueIterator it;
 		if (v->getData().it_eventQueue._Ptr != NULL) {
 			it = events.erase(v->getData().it_eventQueue);
@@ -347,27 +379,27 @@ private:
 		return e;
 	}
 
-	static EdgeDataBBTIterator edgeDataBBT_insert(Arrangement::EdgeData *ed) {
+	static EdgeDataBBTIterator edgeDataBBT_insert(ArrangementEdgeData *ed) {
 		EdgeDataBBTIterator it = edgeDataBBT.insert(ed);
 		ed->it_edgeDataBBT = it;
 		return it;
 	}
-	static EdgeDataBBTIterator edgeDataBBT_insert(EdgeDataBBTIterator hintit, Arrangement::EdgeData *ed) {
+	static EdgeDataBBTIterator edgeDataBBT_insert(EdgeDataBBTIterator hintit, ArrangementEdgeData *ed) {
 		EdgeDataBBTIterator it = edgeDataBBT.insert(hintit, ed);
 		ed->it_edgeDataBBT = it;
 		return it;
 	}
-	static EdgeDataBBTIterator edgeDataBBT_erase(Arrangement::EdgeData *ed) {
+	static EdgeDataBBTIterator edgeDataBBT_erase(ArrangementEdgeData *ed) {
 		return edgeDataBBT.erase(ed->it_edgeDataBBT);
 		ed->it_edgeDataBBT._Ptr = NULL;
 	}
 
-	static bool handleProperIntersectionEvent(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2);
-	static Arrangement::Vertex* updateDCELProperIntersection(Arrangement::EdgeData *ed1, Arrangement::EdgeData *ed2, double int_x, double int_y);
-	static Arrangement::EdgeData* updateDCELVertexEdgeIntersection(Arrangement::Vertex *v, Arrangement::EdgeData *ed);
-	static void updateDCEL2VertexIntersection(Arrangement::Vertex *v, Arrangement::Vertex *v_erase);
-	static void updateDCELTwinEdgeWithOneSharedVertex(Arrangement::HalfEdge *he_prev, Arrangement::HalfEdge *he_next);
-	static void updateDCELTwinEdgeWithTwoSharedVertex(Arrangement::HalfEdge *he_prev, Arrangement::HalfEdge *he_next);
+	static bool handleProperIntersectionEvent(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2);
+	static ArrangementVertex* updateDCELProperIntersection(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2, double int_x, double int_y);
+	static ArrangementEdgeData* updateDCELVertexEdgeIntersection(ArrangementVertex *v, ArrangementEdgeData *ed);
+	static void updateDCEL2VertexIntersection(ArrangementVertex *v, ArrangementVertex *v_erase);
+	static void updateDCELTwinEdgeWithOneSharedVertex(ArrangementHalfEdge *he_prev, ArrangementHalfEdge *he_next);
+	static void updateDCELTwinEdgeWithTwoSharedVertex(ArrangementHalfEdge *he_prev, ArrangementHalfEdge *he_next);
 
 public:
 	SweepLine() {}

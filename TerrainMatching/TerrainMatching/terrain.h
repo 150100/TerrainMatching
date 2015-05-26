@@ -91,6 +91,9 @@ public:
 
     typedef Mesh<TerrainVertexData, TerrainHalfEdgeData, TerrainFaceData> TerrainMesh;
 
+	typedef TerrainMesh::Vertex Vertex;
+	typedef TerrainMesh::HalfEdge HalfEdge;
+	typedef TerrainMesh::Face Face;
     typedef TerrainMesh::EdgeIterator EdgeIterator;
 	
     typedef TerrainEdgeData EdgeData;
@@ -113,12 +116,6 @@ public:
      */
     void loadData(std::vector<double> coordinates, std::vector<unsigned int> triangles);
 
-//    /**
-//     * @brief createGetXYArrangement Make XY-plane projection and return it.
-//     * @return XY-plane projected arrangement of the terrain.
-//     */
-//    Arrangement createGetXYArrangement();
-
     /**
      * @brief createGetTrimTerrain Make a trimmed terrain and return it.
      * @param x_min Minimum x-axis-ratio of the trim area
@@ -128,6 +125,9 @@ public:
      * @return The terrain trimmed by the specified rectangular region.
      */
 	void createGetTrimTerrain(double x_min, double x_max, double y_min, double y_max, Terrain *trimTerrain);
+
+	// Sort the vertices and map data of edges to the corresponding vertices.
+	void sortVerticesAndUpdate();
 
     unsigned int number_of_vertices() {return mesh.getNumVertices();}
     unsigned int number_of_halfedges() {return mesh.getNumHalfEdges();}
@@ -148,10 +148,34 @@ public:
 	double x_min, x_max, y_min, y_max, z_min, z_max;
 	double edgeLength_min, edgeLength_max;
 
-private:
+protected:
     TerrainMesh mesh;
 	std::vector<EdgeData> edgeDataContainer;
 };
 
+bool terrainVertexCompare(const Terrain::TerrainMesh::Vertex &v1, const Terrain::TerrainMesh::Vertex &v2) // v1 < v2
+{
+	return v1.getData().p.x < v2.getData().p.x || (v1.getData().p.x == v2.getData().p.x && v1.getData().p.y < v2.getData().p.y);
+}
+
+
+class TerrainWithGrids : public Terrain
+{
+public:
+	bool gridIsMade;
+
+	TerrainWithGrids() : Terrain(), gridIsMade(false) {}
+
+	// Make grids and distribute vertices into them. Make sure that the mesh data is loaded.
+	void makeGrids(double _gridStepSize);
+
+	// Get vertices in the range.
+	void appendVerticesInRange(double rangeX_min, double rangeX_max, double rangeY_min, double rangeY_max, std::vector<Vertex *> *verticesInRange);
+	
+protected:
+	unsigned gridSizeX, gridSizeY;
+	double gridStepSize;
+	std::vector<Vertex *> **grids;
+};
 
 #endif // TERRAIN_H

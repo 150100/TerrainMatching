@@ -160,8 +160,14 @@ public:
 	// Constructor. Make sure the grids are made.
     Arrangement(TerrainWithGrids *_t1, TerrainWithGrids *_t2);
 
+	// Initialize space. 
+	void initializeSpace();
+
 	// Advance to the next grid cell
 	GridCellSearchState advanceGridCell();
+
+	// Insert translated copies of t1 and -t2.
+	void insertTranslatedCopies();
 
 	// Get arrangement of existing disconnected structure
 	void makeArrangement();

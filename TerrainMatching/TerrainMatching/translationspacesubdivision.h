@@ -39,16 +39,16 @@ class TranslationSpaceSubdivision
 
 public:
 	// Constructor. Make sure that t1 and t2 are sored.
-    TranslationSpaceSubdivision(Terrain *_t1, Terrain *_t2);
+	TranslationSpaceSubdivision(TerrainWithGrids *_t1, TerrainWithGrids *_t2);
 
 	// arrangement
 	Arrangement arr; 
 
 	// domain
-    Terrain *t1; 
+	TerrainWithGrids *t1;
 
 	// patch
-    Terrain *t2; 
+	TerrainWithGrids *t2;
 
 	// Initialization function. Call whenever a new arrangement structure is made.
     void init();

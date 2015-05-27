@@ -4,6 +4,13 @@
 #include <map>
 #include <algorithm>
 
+bool terrainVertexCompare(const Terrain::TerrainMesh::Vertex &v1, const Terrain::TerrainMesh::Vertex &v2) // v1 < v2
+{
+	return v1.getData().p.x < v2.getData().p.x || (v1.getData().p.x == v2.getData().p.x && v1.getData().p.y < v2.getData().p.y);
+}
+
+///
+
 Terrain::Terrain()
 {
     /* initialize members */
@@ -276,7 +283,7 @@ void TerrainWithGrids::makeGrids(double _gridStepSize)
 
 		unsigned int grids_x = std::floor((p.x - x_min) / gridStepSize);
 		if (grids_x == gridSizeX) --grids_x; // handling the boundary due to floor function.
-		unsigned int grids_y = std::floor((p.x - x_min) / gridStepSize);
+		unsigned int grids_y = std::floor((p.y - y_min) / gridStepSize);
 		if (grids_y == gridSizeY) --grids_y; // handling the boundary due to floor function.
 
 		grids[grids_x][grids_y].push_back(v);

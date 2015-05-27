@@ -35,6 +35,7 @@ class TerrainVertexData
 public:
     Point p; // coordinates
     VertexTrianglePair *VTpair; // paired one while translating.
+	unsigned int arrIndex; // index for arrangement structure.
 
     TerrainVertexData()
         : VTpair(NULL) {}
@@ -53,9 +54,10 @@ public:
 class TerrainHalfEdgeData
 {
 public:
-    TerrainEdgeData* edgeData; // Link to edge data.
+    TerrainEdgeData* edgeData; // link to edge data.
+	unsigned int arrIndex; // index for arrangement structure.
 
-	TerrainHalfEdgeData() : edgeData(NULL) {}
+	TerrainHalfEdgeData() : edgeData(NULL), arrIndex(-1) {}
 };
 
 // information of face
@@ -152,12 +154,6 @@ protected:
     TerrainMesh mesh;
 	std::vector<EdgeData> edgeDataContainer;
 };
-
-bool terrainVertexCompare(const Terrain::TerrainMesh::Vertex &v1, const Terrain::TerrainMesh::Vertex &v2) // v1 < v2
-{
-	return v1.getData().p.x < v2.getData().p.x || (v1.getData().p.x == v2.getData().p.x && v1.getData().p.y < v2.getData().p.y);
-}
-
 
 class TerrainWithGrids : public Terrain
 {

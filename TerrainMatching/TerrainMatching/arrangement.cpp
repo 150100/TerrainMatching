@@ -163,12 +163,12 @@ void Arrangement::insertTranslatedCopies()
 	cur_y_max = (cur_y_grid + 1) * y_gridStepSize;
 
 	/* structure of the grid range */
-	// collect translations of (t1) from the vertices of (-t2).
+	// collect translations of (t1) from the vertices of (-t2). ((t1 - v{t2}) ¡û grid ¡Á nil ¢¢ v{t2} ¡ô t1 - grid)
 	std::vector<TerrainVertex *> transScope_t2;
-	double transScope_t2_rangeX_min = -cur_x_max;
-	double transScope_t2_rangeX_max = -cur_x_max + (t1->x_max - t1->x_min);
-	double transScope_t2_rangeY_min = -cur_x_max;
-	double transScope_t2_rangeY_max = -cur_x_max + (t1->y_max - t1->y_min);
+	double transScope_t2_rangeX_min = t1->x_min - cur_x_max;
+	double transScope_t2_rangeX_max = t1->x_max - cur_x_min;
+	double transScope_t2_rangeY_min = t1->y_min - cur_y_max;
+	double transScope_t2_rangeY_max = t1->y_max - cur_y_min;
 	t2->appendVerticesInRange(transScope_t2_rangeX_min, transScope_t2_rangeX_max, transScope_t2_rangeY_min, transScope_t2_rangeY_max, &transScope_t2);
 
 	// for each translation vectors, get copies inside the window.
@@ -178,7 +178,7 @@ void Arrangement::insertTranslatedCopies()
 	for (unsigned int i = 0; i < transScope_t2.size(); ++i) {
 		TerrainVertex *v_t2 = transScope_t2.at(i);
 
-		// collect structure of (t1) in such range (t1 = grid range + v_t2).
+		// collect structure of (t1) in such range. (t1 = grid + v_t2).
 		std::vector<TerrainVertex *> vertexScope_t1;
 		std::vector<TerrainHalfEdge *> halfEdgeScope_t1;
 		double vertexScope_t1_rangeX_min = cur_x_min + v_t2->getData().p.x;
@@ -187,6 +187,8 @@ void Arrangement::insertTranslatedCopies()
 		double vertexScope_t1_rangeY_max = cur_y_max + v_t2->getData().p.y;
 		t1->appendVerticesInRange(vertexScope_t1_rangeX_min, vertexScope_t1_rangeX_max, vertexScope_t1_rangeY_min, vertexScope_t1_rangeY_max, &vertexScope_t1);
 
+		// vertices in the window scope
+		unsigned int halfEdgesIdx_first = halfEdgesIdx;
 		for (unsigned int j = 0; j < vertexScope_t1.size(); ++j) {
 			TerrainVertex *v_t1 = vertexScope_t1.at(j);
 
@@ -199,22 +201,18 @@ void Arrangement::insertTranslatedCopies()
 			v_arr.setIncidentEdge(&halfEdges.at(halfEdgesIdx));
 
 			// mark halfedge index around the vertex
-			unsigned int cur_halfEdgesIdx = halfEdgesIdx;
 			Terrain::EdgeIterator eit(v_t1);
 			while (eit.hasNext()) {
 				TerrainHalfEdge *he = eit.getNext();
 				if (he->getData().arrIndex == -1) {
-					he->getData().arrIndex = cur_halfEdgesIdx++; // mark halfEdge index
-					halfEdgeScope_t1.push_back(he);
-				}
-				TerrainHalfEdge *he_twin = he->getTwin();
-				if (he_twin->getData().arrIndex == -1) {
-					he_twin->getData().arrIndex = cur_halfEdgesIdx++; // mark halfEdge index
-					halfEdgeScope_t1.push_back(he_twin);
+					he->getData().arrIndex = halfEdgesIdx++; // mark halfEdge index
+					halfEdgeScope_t1.push_back(he); // collect halfedges in the window scope
 				}
 			}
 		}
 
+		// edges in the window scope
+		halfEdgesIdx = halfEdgesIdx_first;
 		for (unsigned int j = 0; j < halfEdgeScope_t1.size(); ++j) {
 			TerrainHalfEdge *he_t1 = halfEdgeScope_t1.at(j);
 
@@ -228,19 +226,27 @@ void Arrangement::insertTranslatedCopies()
 			unsigned int he_prevIdx = he_t1->getPrev()->getData().arrIndex;
 			unsigned int he_twinIdx = he_t1->getTwin()->getData().arrIndex;
 
-			if (he_nextIdx != -1)
+#ifdef _DEBUG
+			if (he_originIdx == -1)
+				throw cpp::Exception("originIdx should not be -1.");
+#endif
+			if (he_twinIdx != -1) {
+#ifdef _DEBUG
+				if (he_nextIdx == -1)
+					throw cpp::Exception("nextIdx should not be -1 when twinIdx is not -1.");
+#endif
 				he_arr.setNext(&halfEdges[0] + he_nextIdx);
-			else
-				he_arr.setNext(&halfEdges[0] + he_twinIdx);
-
-			he_arr.setOrigin(&vertices[0] + he_originIdx);
-
-			if (he_prevIdx != -1)
+				he_arr.setOrigin(&vertices[0] + he_originIdx);
 				he_arr.setPrev(&halfEdges[0] + he_prevIdx);
-			else
-				he_arr.setPrev(&halfEdges[0] + he_twinIdx);
+				he_arr.setTwin(&halfEdges[0] + he_twinIdx);
+			}
+			else {
+#ifdef _DEBUG
+				if (he_nextIdx != -1)
+					throw cpp::Exception("nextIdx should be -1 when twinIdx is -1.");
+#endif
 
-			he_arr.setTwin(&halfEdges[0] + he_twinIdx);
+			}
 
 			// copy edgeData info
 			if (he_arr.getData().edgeData == NULL) { // filtering twin edge that is already set
@@ -267,21 +273,27 @@ void Arrangement::insertTranslatedCopies()
 				}
 			}
 		}
+
+		// restore edge markings
+		for (unsigned int j = 0; j < halfEdgeScope_t1.size(); ++j) {
+			TerrainHalfEdge *he_t1 = halfEdgeScope_t1.at(j);
+			he_t1->getData().arrIndex = -1;
+		}
 	}
 
-	// collect translations of (-t2) from the vertices of (t1).
+	// collect translations of (-t2) from the vertices of (t1). ((-t2 + v{t1}) ¡û grid ¡Á nil ¢¢ v{t1} ¡ô t2 + grid)
 	std::vector<TerrainVertex *> transScope_t1;
-	double transScope_t1_rangeX_min = cur_x_max - (t2->x_max - t2->x_min);
-	double transScope_t1_rangeX_max = cur_x_max;
-	double transScope_t1_rangeY_min = cur_x_max - (t2->y_max - t2->y_min);
-	double transScope_t1_rangeY_max = cur_x_max;
+	double transScope_t1_rangeX_min = t2->x_min + cur_x_min;
+	double transScope_t1_rangeX_max = t2->x_max + cur_x_max;
+	double transScope_t1_rangeY_min = t2->y_min + cur_y_min;
+	double transScope_t1_rangeY_max = t2->y_max + cur_y_max;
 	t1->appendVerticesInRange(transScope_t1_rangeX_min, transScope_t1_rangeX_max, transScope_t1_rangeY_min, transScope_t1_rangeY_max, &transScope_t1);
 
 	// for each translation vectors, get copies inside the window.
 	for (unsigned int i = 0; i < transScope_t1.size(); ++i) {
 		TerrainVertex *v_t1 = transScope_t1.at(i);
 
-		// collect structure of (-t2) in such range (-t2 = grid range - v_t1).
+		// collect structure of (-t2) in such range. (-t2 = grid range - v_t1).
 		std::vector<TerrainVertex *> vertexScope_t2;
 		std::vector<TerrainHalfEdge *> halfEdgeScope_t2;
 		double vertexScope_t2_rangeX_min = -cur_x_max + v_t1->getData().p.x;
@@ -290,6 +302,8 @@ void Arrangement::insertTranslatedCopies()
 		double vertexScope_t2_rangeY_max = -cur_y_min + v_t1->getData().p.y;
 		t1->appendVerticesInRange(vertexScope_t2_rangeX_min, vertexScope_t2_rangeX_max, vertexScope_t2_rangeY_min, vertexScope_t2_rangeY_max, &vertexScope_t2);
 
+		// vertices in the window scope
+		unsigned int cur_halfEdgesIdx = halfEdgesIdx;
 		for (unsigned int j = 0; j < vertexScope_t2.size(); ++j) {
 			TerrainVertex *v_t2 = vertexScope_t2.at(j);
 
@@ -302,22 +316,17 @@ void Arrangement::insertTranslatedCopies()
 			v_arr.setIncidentEdge(&halfEdges.at(halfEdgesIdx));
 
 			// mark halfedge index around the vertex
-			unsigned int cur_halfEdgesIdx = halfEdgesIdx;
 			Terrain::EdgeIterator eit(v_t2);
 			while (eit.hasNext()) {
 				TerrainHalfEdge *he = eit.getNext();
 				if (he->getData().arrIndex == -1) {
 					he->getData().arrIndex = cur_halfEdgesIdx++; // mark halfEdge index
-					halfEdgeScope_t2.push_back(he);
-				}
-				TerrainHalfEdge *he_twin = he->getTwin();
-				if (he_twin->getData().arrIndex == -1) {
-					he_twin->getData().arrIndex = cur_halfEdgesIdx++; // mark halfEdge index
-					halfEdgeScope_t2.push_back(he_twin);
+					halfEdgeScope_t2.push_back(he); // collect halfedges in the window scope
 				}
 			}
 		}
 
+		// edges in the window scope
 		for (unsigned int j = 0; j < halfEdgeScope_t2.size(); ++j) {
 			TerrainHalfEdge *he_t2 = halfEdgeScope_t2.at(j);
 
@@ -369,6 +378,12 @@ void Arrangement::insertTranslatedCopies()
 					ed->halfEdge_down = &he_arr;
 				}
 			}
+		}
+
+		// restore edge markings
+		for (unsigned int j = 0; j < halfEdgeScope_t2.size(); ++j) {
+			TerrainHalfEdge *he_t2 = halfEdgeScope_t2.at(j);
+			he_t2->getData().arrIndex = -1;
 		}
 	}
 

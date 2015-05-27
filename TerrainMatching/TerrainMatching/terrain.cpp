@@ -294,9 +294,9 @@ void TerrainWithGrids::makeGrids(double _gridStepSize)
 
 void TerrainWithGrids::appendVerticesInRange(double rangeX_min, double rangeX_max, double rangeY_min, double rangeY_max, std::vector<Vertex *> *verticesInRange)
 {
-	unsigned int gridX_min = std::max((unsigned int)std::floor((rangeX_min - x_min) / gridStepSize), 0u);
+	unsigned int gridX_min = std::max((int)std::floor((rangeX_min - x_min) / gridStepSize), 0);
 	unsigned int gridX_max = std::min((unsigned int)std::ceil((rangeX_max - x_min) / gridStepSize), gridSizeX);
-	unsigned int gridY_min = std::max((unsigned int)std::floor((rangeY_min - y_min) / gridStepSize), 0u);
+	unsigned int gridY_min = std::max((int)std::floor((rangeY_min - y_min) / gridStepSize), 0);
 	unsigned int gridY_max = std::min((unsigned int)std::ceil((rangeY_max - y_min) / gridStepSize), gridSizeY);
 
 	for (unsigned int gridX = gridX_min; gridX < gridX_max; ++gridX) {

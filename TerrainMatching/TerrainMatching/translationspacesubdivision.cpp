@@ -21,7 +21,6 @@ void TranslationSpaceSubdivision::init()
 
     // initialize first cell
     update_CS(he);
-	he->getFace()->getData().state = Arrangement::FaceData::PASSED;
     m_he_stack.push(he);
     m_he_path.push(he);
 }

@@ -60,6 +60,30 @@ public:
 
 typedef Vector2<double> ArrangementVector;
 
+template <class T>
+class ImplicitLine {
+	T a, b, c;
+public:
+	ImplicitLine(T x1, T y1, T x2, T y2) {
+		a = y2 - y1;
+		b = x1 - x2;
+		c = x2*y1 - x1*y2;
+	}
+	ImplicitLine(Vector2<T> &v1, Vector2<T> &v2) {
+		a = v2.y - v1.y;
+		b = v1.x - v2.x;
+		c = v2.x*v1.y - v1.x*v2.y;
+	}
+	double getValue(T x, T y) {
+		return a*x + b*y + c;
+	}
+	double getValue(Vector2<T> &v) {
+		return a*v.x + b*v.y + c;
+	}
+};
+
+typedef ImplicitLine<double> ArrangementImplicitLine;
+
 bool arrVertexCompare(Arrangement::Vertex &v1, Arrangement::Vertex &v2)
 {
 	ArrangementVertexData &vd1 = v1.getData();
@@ -98,7 +122,10 @@ Arrangement::Arrangement(TerrainWithGrids *_t1, TerrainWithGrids *_t2)
 	cur_y_max = y_min + y_gridStepSize;
 
 	// initialize space
-	initializeSpace();
+	const double asymptotic_space = t1->number_of_vertices() + t2->number_of_vertices() * t2->number_of_vertices();
+	vertices.reserve(10 * asymptotic_space);
+	halfEdges.reserve(40 * asymptotic_space);
+	edgeDataContainer.reserve(20 * asymptotic_space);
 
 	// insert translated copies to the structure
 	insertTranslatedCopies();
@@ -109,15 +136,6 @@ Arrangement::Arrangement(TerrainWithGrids *_t1, TerrainWithGrids *_t2)
 
 void Arrangement::initializeSpace()
 {
-	const double asymptotic_space = t1->number_of_vertices() + t2->number_of_vertices() * t2->number_of_vertices();
-	vertices.resize(10 * asymptotic_space);
-	halfEdges.resize(40 * asymptotic_space);
-	edgeDataContainer.resize(20 * asymptotic_space);
-}
-
-GridCellSearchState Arrangement::advanceGridCell()
-{
-	// initialize data structure before
 	vertices.clear();
 	halfEdges.clear();
 	faces.clear();
@@ -126,6 +144,11 @@ GridCellSearchState Arrangement::advanceGridCell()
 	erasedHalfEdgesIndices.clear();
 	erasedFacesIndices.clear();
 	erasedEdgeDataContainerIndices.clear();
+}
+
+GridCellSearchState Arrangement::advanceGridCell()
+{
+	// initialize data structure before
 	initializeSpace();
 
 	// get grid index (zig-zag traversal)
@@ -157,10 +180,14 @@ GridCellSearchState Arrangement::advanceGridCell()
 void Arrangement::insertTranslatedCopies()
 {
 	// get grid range
-	cur_x_min = cur_x_grid * x_gridStepSize;
-	cur_x_max = (cur_x_grid + 1) * x_gridStepSize;
-	cur_y_min = cur_y_grid * y_gridStepSize;
-	cur_y_max = (cur_y_grid + 1) * y_gridStepSize;
+	cur_x_min = cur_x_grid * x_gridStepSize + x_min;
+	cur_x_max = (cur_x_grid + 1) * x_gridStepSize + x_min;
+	cur_y_min = cur_y_grid * y_gridStepSize + y_min;
+	cur_y_max = (cur_y_grid + 1) * y_gridStepSize + y_min;
+	ArrangementVector cur_dL(cur_x_min, cur_y_min);
+	ArrangementVector cur_uL(cur_x_min, cur_y_max);
+	ArrangementVector cur_dR(cur_x_max, cur_y_min);
+	ArrangementVector cur_uR(cur_x_max, cur_y_max);
 
 	/* structure of the grid range */
 	// collect translations of (t1) from the vertices of (-t2). ((t1 - v{t2}) ¡û grid ¡Á nil ¢¢ v{t2} ¡ô t1 - grid)
@@ -189,24 +216,45 @@ void Arrangement::insertTranslatedCopies()
 
 		// vertices in the window scope
 		unsigned int halfEdgesIdx_first = halfEdgesIdx;
+		unsigned int edgeDataIdx_first = edgeDataIdx;
 		for (unsigned int j = 0; j < vertexScope_t1.size(); ++j) {
 			TerrainVertex *v_t1 = vertexScope_t1.at(j);
 
-			Vertex &v_arr = vertices.at(verticesIdx);
+			Vertex *v_arr = createVertex();
 			v_t1->getData().arrIndex = verticesIdx++; // mark vertex index
+			double v_arr_x = v_t1->getData().p.x - v_t2->getData().p.x;
+			double v_arr_y = v_t1->getData().p.y - v_t2->getData().p.y;
 
 			// copy vertex info
-			v_arr.getData().x = v_t1->getData().p.x - v_t2->getData().p.x;
-			v_arr.getData().y = v_t1->getData().p.y - v_t2->getData().p.y;
-			v_arr.setIncidentEdge(&halfEdges.at(halfEdgesIdx));
+			v_arr->getData().x = v_arr_x;
+			v_arr->getData().y = v_arr_y;
+			v_arr->getData().insideWindow = isInWindow(v_arr_x, v_arr_y);
 
 			// mark halfedge index around the vertex
+			bool first = true;
 			Terrain::EdgeIterator eit(v_t1);
 			while (eit.hasNext()) {
+				// insert the halfedge.
 				TerrainHalfEdge *he = eit.getNext();
 				if (he->getData().arrIndex == -1) {
+					createHalfEdge(); // allocate space for the halfedge
+					if (first) {
+						v_arr->setIncidentEdge(&halfEdges.at(halfEdgesIdx));
+						first = false;
+					}
 					he->getData().arrIndex = halfEdgesIdx++; // mark halfEdge index
 					halfEdgeScope_t1.push_back(he); // collect halfedges in the window scope
+				}
+				else if (first) {
+					v_arr->setIncidentEdge(&halfEdges.at(he->getData().arrIndex));
+					first = false;
+				}
+				// insert the twin halfedge.
+				TerrainHalfEdge *he_twin = he->getTwin();
+				if (he_twin->getData().arrIndex == -1) {
+					createHalfEdge(); // allocate space for the halfedge
+					he_twin->getData().arrIndex = halfEdgesIdx++; // mark halfEdge index
+					halfEdgeScope_t1.push_back(he_twin); // collect halfedges in the window scope
 				}
 			}
 		}
@@ -218,35 +266,31 @@ void Arrangement::insertTranslatedCopies()
 
 			HalfEdge &he_arr = halfEdges.at(halfEdgesIdx++);
 
-			// copy halfEdges info
-			he_arr.setFace(NULL); // originally null. To be handled.
-
+			// get halfEdges info indexes
 			unsigned int he_nextIdx = he_t1->getNext()->getData().arrIndex;
 			unsigned int he_originIdx = he_t1->getOrigin()->getData().arrIndex;
 			unsigned int he_prevIdx = he_t1->getPrev()->getData().arrIndex;
 			unsigned int he_twinIdx = he_t1->getTwin()->getData().arrIndex;
 
-#ifdef _DEBUG
-			if (he_originIdx == -1)
-				throw cpp::Exception("originIdx should not be -1.");
-#endif
-			if (he_twinIdx != -1) {
-#ifdef _DEBUG
-				if (he_nextIdx == -1)
-					throw cpp::Exception("nextIdx should not be -1 when twinIdx is not -1.");
-#endif
-				he_arr.setNext(&halfEdges[0] + he_nextIdx);
-				he_arr.setOrigin(&vertices[0] + he_originIdx);
-				he_arr.setPrev(&halfEdges[0] + he_prevIdx);
-				he_arr.setTwin(&halfEdges[0] + he_twinIdx);
+			if (he_nextIdx == -1) he_nextIdx = he_twinIdx;
+			if (he_originIdx == -1) { // insert new vertex just outside the window.
+				he_originIdx = verticesIdx;
+				vertexScope_t1.push_back(he_t1->getOrigin());
+				he_t1->getOrigin()->getData().arrIndex = verticesIdx++;
+				Vertex *v_origin = createVertex();
+				v_origin->getData().x = he_t1->getOrigin()->getData().p.x - v_t2->getData().p.x;
+				v_origin->getData().y = he_t1->getOrigin()->getData().p.y - v_t2->getData().p.y;
+				v_origin->setIncidentEdge(&he_arr);
 			}
-			else {
-#ifdef _DEBUG
-				if (he_nextIdx != -1)
-					throw cpp::Exception("nextIdx should be -1 when twinIdx is -1.");
-#endif
+			if (he_prevIdx == -1) he_prevIdx = he_twinIdx;
+			if (he_twinIdx == -1) throw cpp::Exception("Twin should be inserted.");
 
-			}
+			// copy halfEdges info
+			he_arr.setFace(NULL); // originally null. To be handled.
+			he_arr.setNext(&halfEdges[0] + he_nextIdx);
+			he_arr.setOrigin(&vertices[0] + he_originIdx);
+			he_arr.setPrev(&halfEdges[0] + he_prevIdx);
+			he_arr.setTwin(&halfEdges[0] + he_twinIdx);
 
 			// copy edgeData info
 			if (he_arr.getData().edgeData == NULL) { // filtering twin edge that is already set
@@ -255,10 +299,11 @@ void Arrangement::insertTranslatedCopies()
 				s.he = he_t1;
 				s.v = v_t2;
 				s.he_is_from_patch = false;
-				EdgeData &ed_dest = edgeDataContainer.at(edgeDataIdx++);
-				ed_dest.sources.push_back(s);
-				he_arr.getData().edgeData = &ed_dest;
-				he_arr.getTwin()->getData().edgeData = &ed_dest;
+				EdgeData *ed_dest = createEdgeData();
+				ed_dest->sources.push_back(s);
+				he_arr.getData().edgeData = ed_dest;
+				he_arr.getTwin()->getData().edgeData = ed_dest;
+				++edgeDataIdx;
 			}
 			else { // when already set, we can get twin's origin.
 				// considering halfEdge position (face is upward or downward), identify upedge and downedge.
@@ -275,6 +320,10 @@ void Arrangement::insertTranslatedCopies()
 		}
 
 		// restore edge markings
+		for (unsigned int j = 0; j < vertexScope_t1.size(); ++j) {
+			TerrainVertex *v_t1 = vertexScope_t1.at(j);
+			v_t1->getData().arrIndex = -1;
+		}
 		for (unsigned int j = 0; j < halfEdgeScope_t1.size(); ++j) {
 			TerrainHalfEdge *he_t1 = halfEdgeScope_t1.at(j);
 			he_t1->getData().arrIndex = -1;
@@ -303,55 +352,80 @@ void Arrangement::insertTranslatedCopies()
 		t1->appendVerticesInRange(vertexScope_t2_rangeX_min, vertexScope_t2_rangeX_max, vertexScope_t2_rangeY_min, vertexScope_t2_rangeY_max, &vertexScope_t2);
 
 		// vertices in the window scope
-		unsigned int cur_halfEdgesIdx = halfEdgesIdx;
+		unsigned int halfEdgesIdx_first = halfEdgesIdx;
+		unsigned int edgeDataIdx_first = edgeDataIdx;
 		for (unsigned int j = 0; j < vertexScope_t2.size(); ++j) {
 			TerrainVertex *v_t2 = vertexScope_t2.at(j);
 
-			Vertex &v_arr = vertices.at(verticesIdx);
+			Vertex *v_arr = createVertex();
 			v_t2->getData().arrIndex = verticesIdx++; // mark vertex index
+			double v_arr_x = v_t1->getData().p.x - v_t2->getData().p.x;
+			double v_arr_y = v_t1->getData().p.y - v_t2->getData().p.y;
 
 			// copy vertex info
-			v_arr.getData().x = v_t1->getData().p.x - v_t2->getData().p.x;
-			v_arr.getData().y = v_t1->getData().p.y - v_t2->getData().p.y;
-			v_arr.setIncidentEdge(&halfEdges.at(halfEdgesIdx));
+			v_arr->getData().x = v_arr_x;
+			v_arr->getData().y = v_arr_y;
+			v_arr->getData().insideWindow = isInWindow(v_arr_x, v_arr_y);
 
 			// mark halfedge index around the vertex
+			bool first = true;
 			Terrain::EdgeIterator eit(v_t2);
 			while (eit.hasNext()) {
 				TerrainHalfEdge *he = eit.getNext();
 				if (he->getData().arrIndex == -1) {
-					he->getData().arrIndex = cur_halfEdgesIdx++; // mark halfEdge index
+					createHalfEdge(); // allocate space for the halfedge
+					if (first) {
+						v_arr->setIncidentEdge(&halfEdges.at(halfEdgesIdx));
+						first = false;
+					}
+					he->getData().arrIndex = halfEdgesIdx++; // mark halfEdge index
 					halfEdgeScope_t2.push_back(he); // collect halfedges in the window scope
+				}
+				else if (first) {
+					v_arr->setIncidentEdge(&halfEdges.at(he->getData().arrIndex));
+					first = false;
+				}
+				TerrainHalfEdge *he_twin = he->getTwin();
+				if (he_twin->getData().arrIndex == -1) {
+					createHalfEdge(); // allocate space for the halfedge
+					he_twin->getData().arrIndex = halfEdgesIdx++; // mark halfEdge index
+					halfEdgeScope_t2.push_back(he_twin); // collect halfedges in the window scope
 				}
 			}
 		}
 
 		// edges in the window scope
+		halfEdgesIdx = halfEdgesIdx_first;
 		for (unsigned int j = 0; j < halfEdgeScope_t2.size(); ++j) {
 			TerrainHalfEdge *he_t2 = halfEdgeScope_t2.at(j);
 
 			HalfEdge &he_arr = halfEdges.at(halfEdgesIdx++);
 
-			// copy halfEdges info
-			he_arr.setFace(NULL); // originally null. To be handled.
-
+			// get halfEdges info indexes
 			unsigned int he_nextIdx = he_t2->getNext()->getData().arrIndex;
 			unsigned int he_originIdx = he_t2->getOrigin()->getData().arrIndex;
 			unsigned int he_prevIdx = he_t2->getPrev()->getData().arrIndex;
 			unsigned int he_twinIdx = he_t2->getTwin()->getData().arrIndex;
 
-			if (he_nextIdx != -1)
-				he_arr.setNext(&halfEdges[0] + he_nextIdx);
-			else
-				he_arr.setNext(&halfEdges[0] + he_twinIdx);
+			if (he_nextIdx == -1) he_nextIdx = he_twinIdx;
+			if (he_originIdx == -1) { // insert new vertex just outside the window.
+				he_originIdx = verticesIdx;
+				vertexScope_t2.push_back(he_t2->getOrigin());
+				he_t2->getOrigin()->getData().arrIndex = verticesIdx++;
+				Vertex *v_origin = createVertex();
+				Point &p_origin = he_t2->getOrigin()->getData().p;
+				v_origin->getData().x = p_origin.x;
+				v_origin->getData().y = p_origin.y;
+				v_origin->setIncidentEdge(&he_arr);
+			}
+			if (he_prevIdx == -1) he_prevIdx = he_twinIdx;
+			if (he_twinIdx == -1) throw cpp::Exception("Twin should be inserted.");
 
+			// copy halfEdges info
+			he_arr.setFace(NULL); // originally null. To be handled.
+			he_arr.setNext(&halfEdges[0] + he_nextIdx);
 			he_arr.setOrigin(&vertices[0] + he_originIdx);
-
-			if (he_prevIdx != -1)
-				he_arr.setPrev(&halfEdges[0] + he_prevIdx);
-			else
-				he_arr.setPrev(&halfEdges[0] + he_twinIdx);
-
+			he_arr.setPrev(&halfEdges[0] + he_prevIdx);
 			he_arr.setTwin(&halfEdges[0] + he_twinIdx);
 
 			// copy edgeData info
@@ -361,10 +435,11 @@ void Arrangement::insertTranslatedCopies()
 				s.he = he_t2;
 				s.v = v_t1;
 				s.he_is_from_patch = false;
-				EdgeData &ed_dest = edgeDataContainer.at(edgeDataIdx++);
-				ed_dest.sources.push_back(s);
-				he_arr.getData().edgeData = &ed_dest;
-				he_arr.getTwin()->getData().edgeData = &ed_dest;
+				EdgeData *ed_dest = createEdgeData();
+				ed_dest->sources.push_back(s);
+				he_arr.getData().edgeData = ed_dest;
+				he_arr.getTwin()->getData().edgeData = ed_dest;
+				++edgeDataIdx;
 			}
 			else { // when already set, we can get twin's origin.
 				// considering halfEdge position (face is upward or downward), identify upedge and downedge.
@@ -398,87 +473,82 @@ void Arrangement::insertTranslatedCopies()
 	    v1   he1d   v2
 	*/
 
-	Vertex &v1WB = vertices.at(verticesIdx++);
-	Vertex &v2WB = vertices.at(verticesIdx++);
-	Vertex &v3WB = vertices.at(verticesIdx++);
-	Vertex &v4WB = vertices.at(verticesIdx++);
-	HalfEdge &he1uWB = halfEdges.at(halfEdgesIdx++);
-	HalfEdge &he2uWB = halfEdges.at(halfEdgesIdx++);
-	HalfEdge &he3uWB = halfEdges.at(halfEdgesIdx++);
-	HalfEdge &he4uWB = halfEdges.at(halfEdgesIdx++);
-	HalfEdge &he1dWB = halfEdges.at(halfEdgesIdx++);
-	HalfEdge &he2dWB = halfEdges.at(halfEdgesIdx++);
-	HalfEdge &he3dWB = halfEdges.at(halfEdgesIdx++);
-	HalfEdge &he4dWB = halfEdges.at(halfEdgesIdx++);
-	EdgeData &ed1WB = edgeDataContainer.at(edgeDataIdx++);
-	EdgeData &ed2WB = edgeDataContainer.at(edgeDataIdx++);
-	EdgeData &ed3WB = edgeDataContainer.at(edgeDataIdx++);
-	EdgeData &ed4WB = edgeDataContainer.at(edgeDataIdx++);
-	v1WB.setIncidentEdge(&he1uWB);
-	v1WB.getData().x = cur_x_min;
-	v1WB.getData().y = cur_y_min;
-	v2WB.setIncidentEdge(&he2uWB);
-	v2WB.getData().x = cur_x_max;
-	v2WB.getData().y = cur_y_min;
-	v3WB.setIncidentEdge(&he3dWB);
-	v3WB.getData().x = cur_x_max;
-	v3WB.getData().y = cur_y_max;
-	v4WB.setIncidentEdge(&he4dWB);
-	v4WB.getData().x = cur_x_min;
-	v4WB.getData().y = cur_y_max;
-	he1uWB.setNext(&he2uWB);
-	he1uWB.setOrigin(&v1WB);
-	he1uWB.setPrev(&he4dWB);
-	he1uWB.setTwin(&he1dWB);
-	he1uWB.getData().edgeData = &ed1WB;
-	he1dWB.setNext(&he4uWB);
-	he1dWB.setOrigin(&v2WB);
-	he1dWB.setPrev(&he2dWB);
-	//he1dWB.setTwin(&he1uWB);
-	he1dWB.getData().edgeData = &ed1WB;
-	he2uWB.setNext(&he3dWB);
-	he2uWB.setOrigin(&v2WB);
-	//he2uWB.setPrev(&he1uWB);
-	he2uWB.setTwin(&he2dWB);
-	he2uWB.getData().edgeData = &ed2WB;
-	//he2dWB.setNext(&he1dWB);
-	he2dWB.setOrigin(&v3WB);
-	he2dWB.setPrev(&he3uWB);
-	//he2dWB.setTwin(&he2uWB);
-	he2dWB.getData().edgeData = &ed2WB;
-	//he3uWB.setNext(&he2dWB);
-	he3uWB.setOrigin(&v4WB);
-	he3uWB.setPrev(&he4uWB);
-	he3uWB.setTwin(&he3dWB);
-	he3uWB.getData().edgeData = &ed3WB;
-	he3dWB.setNext(&he4dWB);
-	he3dWB.setOrigin(&v3WB);
-	//he3dWB.setPrev(&he2uWB);
-	//he3dWB.setTwin(&he3uWB);
-	he3dWB.getData().edgeData = &ed3WB;
-	//he4uWB.setNext(&he1dWB);
-	he4uWB.setOrigin(&v1WB);
-	//he4uWB.setPrev(&he1dWB);
-	he4uWB.setTwin(&he4dWB);
-	he4uWB.getData().edgeData = &ed4WB;
-	//he4dWB.setNext(&he1uWB);
-	he4dWB.setOrigin(&v4WB);
-	//he4dWB.setPrev(&he3dWB);
-	//he4dWB.setTwin(&he4uWB);
-	he4dWB.getData().edgeData = &ed4WB;
-	ed1WB.halfEdge_up = &he1uWB;
-	ed1WB.halfEdge_down = &he1dWB;
-	ed2WB.halfEdge_up = &he2uWB;
-	ed2WB.halfEdge_down = &he2dWB;
-	ed3WB.halfEdge_up = &he3uWB;
-	ed3WB.halfEdge_down = &he3dWB;
-	ed4WB.halfEdge_up = &he4uWB;
-	ed4WB.halfEdge_down = &he4dWB;
-
-	// shrink the space
-	vertices.resize(verticesIdx);
-	halfEdges.resize(halfEdgesIdx);
-	edgeDataContainer.resize(edgeDataIdx);
+	Vertex *v1WB = createVertex();
+	Vertex *v2WB = createVertex();
+	Vertex *v3WB = createVertex();
+	Vertex *v4WB = createVertex();
+	HalfEdge *he1uWB = createHalfEdge();
+	HalfEdge *he2uWB = createHalfEdge();
+	HalfEdge *he3uWB = createHalfEdge();
+	HalfEdge *he4uWB = createHalfEdge();
+	HalfEdge *he1dWB = createHalfEdge();
+	HalfEdge *he2dWB = createHalfEdge();
+	HalfEdge *he3dWB = createHalfEdge();
+	HalfEdge *he4dWB = createHalfEdge();
+	EdgeData *ed1WB = createEdgeData();
+	EdgeData *ed2WB = createEdgeData();
+	EdgeData *ed3WB = createEdgeData();
+	EdgeData *ed4WB = createEdgeData();
+	v1WB->setIncidentEdge(he1uWB);
+	v1WB->getData().x = cur_x_min;
+	v1WB->getData().y = cur_y_min;
+	v2WB->setIncidentEdge(he2uWB);
+	v2WB->getData().x = cur_x_max;
+	v2WB->getData().y = cur_y_min;
+	v3WB->setIncidentEdge(he3dWB);
+	v3WB->getData().x = cur_x_max;
+	v3WB->getData().y = cur_y_max;
+	v4WB->setIncidentEdge(he4dWB);
+	v4WB->getData().x = cur_x_min;
+	v4WB->getData().y = cur_y_max;
+	he1uWB->setNext(he2uWB);
+	he1uWB->setOrigin(v1WB);
+	he1uWB->setPrev(he4dWB);
+	he1uWB->setTwin(he1dWB);
+	he1uWB->getData().edgeData = ed1WB;
+	he1dWB->setNext(he4uWB);
+	he1dWB->setOrigin(v2WB);
+	he1dWB->setPrev(he2dWB);
+	//he1dWB->setTwin(he1uWB);
+	he1dWB->getData().edgeData = ed1WB;
+	he2uWB->setNext(he3dWB);
+	he2uWB->setOrigin(v2WB);
+	//he2uWB->setPrev(he1uWB);
+	he2uWB->setTwin(he2dWB);
+	he2uWB->getData().edgeData = ed2WB;
+	//he2dWB->setNext(he1dWB);
+	he2dWB->setOrigin(v3WB);
+	he2dWB->setPrev(he3uWB);
+	//he2dWB->setTwin(he2uWB);
+	he2dWB->getData().edgeData = ed2WB;
+	//he3uWB->setNext(he2dWB);
+	he3uWB->setOrigin(v4WB);
+	he3uWB->setPrev(he4uWB);
+	he3uWB->setTwin(he3dWB);
+	he3uWB->getData().edgeData = ed3WB;
+	he3dWB->setNext(he4dWB);
+	he3dWB->setOrigin(v3WB);
+	//he3dWB->setPrev(he2uWB);
+	//he3dWB->setTwin(he3uWB);
+	he3dWB->getData().edgeData = ed3WB;
+	//he4uWB->setNext(he1dWB);
+	he4uWB->setOrigin(v1WB);
+	//he4uWB->setPrev(he1dWB);
+	he4uWB->setTwin(he4dWB);
+	he4uWB->getData().edgeData = ed4WB;
+	//he4dWB->setNext(he1uWB);
+	he4dWB->setOrigin(v4WB);
+	//he4dWB->setPrev(he3dWB);
+	//he4dWB->setTwin(he4uWB);
+	he4dWB->getData().edgeData = ed4WB;
+	ed1WB->halfEdge_up = he1uWB;
+	ed1WB->halfEdge_down = he1dWB;
+	ed2WB->halfEdge_up = he2uWB;
+	ed2WB->halfEdge_down = he2dWB;
+	ed3WB->halfEdge_up = he3uWB;
+	ed3WB->halfEdge_down = he3dWB;
+	ed4WB->halfEdge_up = he4uWB;
+	ed4WB->halfEdge_down = he4dWB;
 }
 
 void Arrangement::makeArrangement()
@@ -490,17 +560,27 @@ void Arrangement::makeArrangement()
 	// Construct faces.
 	faces.reserve(number_of_edges() - number_of_vertices() + 2); // Euler's law. e - v + d(=2) = f
 	const HalfEdge *first_he = getFirstHalfEdge();
+	auto erased_heit = erasedHalfEdgesIndices.begin();
 	for (unsigned int i = 0; i < halfEdges.size(); ++i) {
-		HalfEdge &he = halfEdges.at(i);
-		if (he.getFace() == NULL) { // if face is not set yet, set face of all boundary halfEdges of the face.
-			Face *f = createFace();
-			f->setBoundary(&he);
-			EdgeIterator eit(f);
-			while (eit.hasNext()) {
-				HalfEdge *eit_he = eit.getNext();
-				eit_he->setFace(f);
-				if (first_he == eit_he) { // if he is firstHalfEdge, set this face to the outerface.
-					setOuterface(f);
+		if (erased_heit != erasedHalfEdgesIndices.end() && *erased_heit == i) { // discard the erased halfEdge.
+			++erased_heit;
+		}
+		else {
+			HalfEdge &he = halfEdges.at(i);
+			if (he.getFace() == NULL) { // if face is not set yet, set face of all boundary halfEdges of the face.
+				Face *f = createFace();
+				f->setBoundary(&he);
+				EdgeIterator eit(f);
+				while (eit.hasNext()) {
+					HalfEdge *eit_he = eit.getNext();
+#ifdef DEBUG
+					if (eit_he->getFace() != NULL)
+						std::cout << "ERROR FACE : " << eit_he->getFace() - &faces[0] << '\n';
+#endif
+					eit_he->setFace(f);
+					if (first_he == eit_he) { // if he is firstHalfEdge, set this face to the outerface.
+						setOuterface(f);
+					}
 				}
 			}
 		}
@@ -594,13 +674,12 @@ bool SweepLine::handleProperIntersectionEvent(ArrangementEdgeData *ed1, Arrangem
 
 	// (x,y) in the segment range?
 	if ((det > 0
-		&& v1L.x * det < x_det && x_det < v1R.x * det
-		&& v2L.x * det < x_det && x_det < v2R.x * det
-		&& y_range.first * det < y_det && y_det < y_range.second * det)
+		&& ((x_range.first * det < x_det && x_det < x_range.second * det) ||
+		    (y_range.first * det < y_det && y_det < y_range.second * det)))
 	 || (det < 0
-		&& v1L.x * det > x_det && x_det > v1R.x * det
-		&& v2L.x * det > x_det && x_det > v2R.x * det
-		&& y_range.first * det > y_det && y_det > y_range.second * det)) {
+		&& ((x_range.first * det > x_det && x_det > x_range.second * det) ||
+			(y_range.first * det > y_det && y_det > y_range.second * det))))
+	{
 		// if two edges properly intersect, create new intersection event.
 #ifdef DEBUG
 		std::cerr << "-- Intersection : (" << x_det / det << ',' << y_det / det << ") " << ed1 << ' ' << ed2 << '\n';
@@ -683,11 +762,12 @@ SweepLine::updateDCELVertexEdgeIntersection(ArrangementVertex *v, ArrangementEdg
 	ArrangementHalfEdge *edNu = parent->createHalfEdge();
 	ArrangementHalfEdge *edNd = parent->createHalfEdge();
 	ArrangementVertex *v_dummy = parent->createVertex();
-	v_dummy->getData() = v->getData(); // copy constructor
+	v_dummy->getData().x = v->getData().x;
+	v_dummy->getData().y = v->getData().y;
 
 #ifdef DEBUG
-	if (!(edu->getOrigin()->getData() < v_dummy->getData() && v_dummy->getData() < edd->getOrigin()->getData()))
-		throw cpp::Exception("ed -> v -> edN");
+	/*if (!(edu->getOrigin()->getData() < v_dummy->getData() && v_dummy->getData() < edd->getOrigin()->getData()))
+		throw cpp::Exception("ed -> v -> edN");*/
 
 	for (unsigned int i = 0; i < parent->halfEdges.size(); ++i) {
 		if (parent->halfEdges[i].getOrigin() == v_dummy)
@@ -959,18 +1039,18 @@ void SweepLine::advance()
 #endif
 		updateDCEL2VertexIntersection(ep.v, ep_next.v);
 	}
-//
-//#ifdef DEBUG
-//	std::cerr << "Merging same-position events done.\n";
-//	EdgeDataBBTIterator it_debug = edgeDataBBT.begin();
-//	while (it_debug != edgeDataBBT.end()) {
-//		std::cerr << *it_debug << " = ";
-//		(*it_debug)->print(std::cerr);
-//		std::cerr << '\n';
-//		++it_debug;
-//	}
-//	std::cerr << '\n';
-//#endif
+
+#ifdef DEBUG
+	std::cerr << "Merging same-position events done.\n";
+	EdgeDataBBTIterator it_debug = edgeDataBBT.begin();
+	while (it_debug != edgeDataBBT.end()) {
+		std::cerr << *it_debug << " = ";
+		(*it_debug)->print(std::cerr);
+		std::cerr << '\n';
+		++it_debug;
+	}
+	std::cerr << '\n';
+#endif
 
 	// Insert the edges before current sweepline.
 	Arrangement::EdgeIterator eit(ep.v);
@@ -981,16 +1061,18 @@ void SweepLine::advance()
 	ArrangementVector vec_edge_before_event, vec_edge_after_event;
 	while (eit.hasNext()) {
 		ArrangementHalfEdge *he = eit.getNext();
-		const Arrangement::VertexData &vd = he->getTwin()->getOrigin()->getData();
+		const Arrangement::VertexData vd = he->getTwin()->getOrigin()->getData();
 		ArrangementVector vec_edge = ArrangementVector(vd) - vec_v;
 
-		if (vd < ep.v->getData()) { // if he is the first before-event edge, set it to the first edge of before-edges.
+		const double eps = 0.0000000000001;
+		if (vd.x < ep.v->getData().x - eps || (vd.x < ep.v->getData().x + eps && vd.y < ep.v->getData().y - eps))
+		{ // if he is the first before-event edge, set it to the first edge of before-edges.
 			if (BEedge == NULL || vec_edge.isLeftFrom(vec_edge_before_event)) {
 				BEedge = he;
 				vec_edge_before_event = vec_edge;
 			}
 		}
-		else if (ep.v->getData() < vd) { // if he is the first after-event edge, set it to the first edge of after-edges.
+		else if (vd.x > ep.v->getData().x + eps || (vd.x > ep.v->getData().x - eps && vd.y > ep.v->getData().y + eps)) { // if he is the first after-event edge, set it to the first edge of after-edges.
 			if (AEedge == NULL || vec_edge.isLeftFrom(vec_edge_after_event)) {
 				AEedge = he;
 				vec_edge_after_event = vec_edge;
@@ -1004,14 +1086,18 @@ void SweepLine::advance()
 	// twin edge candidate
 	if (BEedge != NULL) {
 		ArrangementHalfEdge *BEedge_cand = BEedge->getPrev()->getTwin();
-		while (ArrangementVector(BEedge).det(BEedge_cand) == 0) {
+		ArrangementVector BEedge_vec(BEedge);
+		ArrangementVector BEedge_cand_vec(BEedge_cand);
+		while (BEedge_vec.det(BEedge_cand_vec) == 0 && BEedge_vec.x * BEedge_cand_vec.x > 0) {
 			BEedge = BEedge_cand;
 			BEedge_cand = BEedge->getTwin()->getNext();
 		}
 	}
 	if (AEedge != NULL) {
 		ArrangementHalfEdge *AEedge_cand = AEedge->getPrev()->getTwin();
-		while (ArrangementVector(AEedge).det(AEedge_cand) == 0) {
+		ArrangementVector AEedge_vec(AEedge);
+		ArrangementVector AEedge_cand_vec(AEedge_cand);
+		while (AEedge_vec.det(AEedge_cand_vec) == 0 && AEedge_vec.x * AEedge_cand_vec.x > 0) {
 			AEedge = AEedge_cand;
 			AEedge_cand = AEedge->getPrev()->getTwin();
 		}
@@ -1037,19 +1123,19 @@ void SweepLine::advance()
 			handleProperIntersectionEvent(ed2, ed1);
 		}
 	}
-//
-//#ifdef DEBUG
-//	std::cerr << "Erase mode done.\n";
-//	it_debug = edgeDataBBT.begin();
-//	while (it_debug != edgeDataBBT.end()) {
-//		std::cerr << *it_debug << " = ";
-//		(*it_debug)->print(std::cerr);
-//		std::cerr << '\n';
-//		++it_debug;
-//	}
-//	std::cerr << '\n';
-//#endif
-//
+
+#ifdef DEBUG
+	std::cerr << "Erase mode done.\n";
+	it_debug = edgeDataBBT.begin();
+	while (it_debug != edgeDataBBT.end()) {
+		std::cerr << *it_debug << " = ";
+		(*it_debug)->print(std::cerr);
+		std::cerr << '\n';
+		++it_debug;
+	}
+	std::cerr << '\n';
+#endif
+
 	// Insert mode. ¢Å
 	if (AEedge != NULL) {
 
@@ -1093,16 +1179,16 @@ void SweepLine::advance()
 		firstEvent = false;
 	}
 
-//#ifdef DEBUG
-//	std::cerr << "Insert mode done.\n";
-//	it_debug = edgeDataBBT.begin();
-//	while (it_debug != edgeDataBBT.end()) {
-//		std::cerr << *it_debug <<  " = ";
-//		(*it_debug)->print(std::cerr);
-//		std::cerr << '\n';
-//		++it_debug;
-//	}
-//	std::cerr << '\n';
-//#endif
+#ifdef DEBUG
+	std::cerr << "Insert mode done.\n";
+	it_debug = edgeDataBBT.begin();
+	while (it_debug != edgeDataBBT.end()) {
+		std::cerr << *it_debug <<  " = ";
+		(*it_debug)->print(std::cerr);
+		std::cerr << '\n';
+		++it_debug;
+	}
+	std::cerr << '\n';
+#endif
 }
 

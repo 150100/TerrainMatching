@@ -5,6 +5,9 @@
 #include "terrain.h"
 #include "translationspacesubdivision.h"
 
+#ifdef _DEBUG
+	#define	DEBUG
+#endif
 
 int main(int argc, char **argv)
 {
@@ -73,10 +76,13 @@ int main(int argc, char **argv)
 #endif
 
 
+	// ------------- Traverse structure ---------------
 
-    // ------------- TSS setting ---------------
+	//std::cerr << "Traversal start (s to start) : ";
+	//std::cin >> ch;
+	//if (ch != 's') throw cpp::Exception("Wrong command.");
 
-    std::cerr << "Translation space initializing..." << std::endl;
+	std::cerr << "Traversal start.\n";
 
     // TSS construction
 #ifdef DEBUG
@@ -122,12 +128,6 @@ int main(int argc, char **argv)
 	//std::cerr << "time elapsed = " << (double)() / (double)CLOCKS_PER_SEC << std::endl;
 
 
-    // ------------- Traverse structure ---------------
-
-    std::cerr << "Traversal start (s to start) : ";
-    std::cin >> ch;
-	if (ch != 's') throw cpp::Exception("Wrong command.");
-
 #ifdef DEBUG
     unsigned int numCellTraversed = 0;
 	clock_t clock_TraversalStart = clock();
@@ -141,6 +141,7 @@ int main(int argc, char **argv)
 	clock_t clock_IntervalStart = clock();
 #endif
 	do {
+		std::cerr << "\n<< Next Grid >>\n";
 		do {
 			//std::cin >> ch;
 #ifdef DEBUG

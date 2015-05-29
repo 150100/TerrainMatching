@@ -28,6 +28,7 @@ public:
 
     double x,y; // coordinates
 	std::multiset<Event, std::greater<Event>>::iterator it_eventQueue;
+	bool insideWindow;
 
 	ArrangementVertexData() { x = 0; y = 0; it_eventQueue._Ptr = NULL; }
 	ArrangementVertexData(Terrain::VertexData &tvd) { x = tvd.p.x; y = tvd.p.y; }
@@ -58,7 +59,7 @@ public:
 class ArrangementFaceData
 {
 public:
-	enum TraverseState { NOTPASSED, CHECKED, PASSED };
+	enum TraverseState { NOTPASSED, CHECKED, PASSED, OUTERFACE };
 
     TraverseState state; // information for DFS
 
@@ -178,6 +179,11 @@ public:
 	inline unsigned int number_of_edges() { return edgeDataContainer.size() - erasedEdgeDataContainerIndices.size(); }
 	inline unsigned int number_of_faces() { return faces.size() - erasedFacesIndices.size(); }
 
+	// A point is in the window?
+	inline bool isInWindow(double x, double y) {
+		return cur_x_min <= x && x <= cur_x_max && cur_y_min <= y && y <= cur_y_max;
+	}
+
 	// Get the outerface.
 	inline Face* getOuterface() {
 		return &faces.at(outerface);
@@ -185,6 +191,7 @@ public:
 	// Set the outerface. (Set firstHalfEdge first.)
 	inline void setOuterface(Face *f) {
 		outerface = f - &faces[0];
+		f->getData().state = FaceData::OUTERFACE;
 #ifdef _DEBUG
 		if (&faces[outerface] != halfEdges[firstHalfEdge].getFace())
 			throw cpp::Exception("Outerface should be an adjacent face of firstHalfEdge.");
@@ -366,11 +373,13 @@ private:
 	static double x_stepSize, y_stepSize;
 
 	static EventQueueIterator events_insert(ArrangementVertex *v) {
-		EventQueueIterator it = events.insert(Event(v));
+		//std::cerr << "event insert : " << v << '\n';
+		EventQueueIterator it = events.emplace(v);
 		v->getData().it_eventQueue = it;
 		return it;
 	}
 	static EventQueueIterator events_erase(ArrangementVertex *v) {
+		//std::cerr << "event erase : " << v << '\n';
 		EventQueueIterator it;
 		if (v->getData().it_eventQueue._Ptr != NULL) {
 			it = events.erase(v->getData().it_eventQueue);
@@ -380,6 +389,7 @@ private:
 	}
 	static Event events_popfront() {
 		Event e = *events.begin();
+		//std::cerr << "event popfront : " << e.v << '\n';
 		events.erase(events.begin());
 		e.v->getData().it_eventQueue._Ptr = NULL;
 		return e;

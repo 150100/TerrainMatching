@@ -38,7 +38,7 @@ public:
 	unsigned int arrIndex; // index for arrangement structure.
 
     TerrainVertexData()
-        : VTpair(NULL) {}
+        : VTpair(NULL), arrIndex(-1) {}
 
     void setCoordinates(double _x, double _y, double _z) {p.x = _x; p.y = _y; p.z = _z;}
 };

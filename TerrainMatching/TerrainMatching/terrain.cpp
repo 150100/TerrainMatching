@@ -88,6 +88,14 @@ void Terrain::loadData(const char *filename)
 			}
 
 			EdgeData ed;
+			if (he->getOrigin() < he->getTwin()->getOrigin()) {
+				ed.halfEdge_up = he;
+				ed.halfEdge_down = he->getTwin();
+			}
+			else if (he->getOrigin() > he->getTwin()->getOrigin()) {
+				ed.halfEdge_up = he->getTwin();
+				ed.halfEdge_down = he;
+			}
 			edgeDataContainer.push_back(ed);
 			he->getData().edgeData = &edgeDataContainer.back();
 			he->getTwin()->getData().edgeData = &edgeDataContainer.back();

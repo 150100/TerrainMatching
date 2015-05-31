@@ -1,6 +1,7 @@
 #ifndef COMBINATORIALSTRUCTURE_H
 #define COMBINATORIALSTRUCTURE_H
 
+#include "common.h"
 #include "terrain.h"
 #include "matousek.h"
 #include <list>
@@ -55,46 +56,18 @@ class EdgeEdgePair : public CombinatorialPair
 {
 public:
     typedef Terrain::TerrainMesh::Vertex TerrainVertex;
-    typedef Terrain::TerrainMesh::HalfEdge TerrainHalfEdge;
+    typedef Terrain::EdgeData TerrainEdgeData;
 
-    class Edge
-    {
-    public:
-        Edge() {}
-        Edge(Edge &_e) {*this = _e;}
-        Edge(TerrainHalfEdge *_he) {he = _he;}
+    TerrainEdgeData *ed1, *ed2;
+    bool ed1_is_from_patch;
 
-        TerrainHalfEdge *he;
-
-        bool sameEdge(Edge &_e) {
-			return _e.he->getData().edgeData == he->getData().edgeData;
-            //return  (_e.he->getOrigin() == he->getOrigin()
-            //         && _e.he->getNext()->getOrigin() == he->getNext()->getOrigin())
-            //     || (_e.he->getOrigin() == he->getNext()->getOrigin()
-            //         && _e.he->getNext()->getOrigin() == he->getOrigin());
-        }
-        bool sameEdge(TerrainHalfEdge *_he) {
-			return _he->getData().edgeData == he->getData().edgeData;
-            //return  (_he->getOrigin() == he->getOrigin()
-            //         && _he->getNext()->getOrigin() == he->getNext()->getOrigin())
-            //     || (_he->getOrigin() == he->getNext()->getOrigin()
-            //         && _he->getNext()->getOrigin() == he->getOrigin());
-        }
-        bool containsVertex(TerrainVertex *_v) {
-            return he->getOrigin() == _v || he->getNext()->getOrigin() == _v;
-        }
-    };
-
-    Edge edge1, edge2;
-    bool edge1_is_from_patch;
-
-    EdgeEdgePair(TerrainHalfEdge *_he1, TerrainHalfEdge *_he2, bool _he1_is_from_patch)
-        : edge1(_he1), edge2(_he2), edge1_is_from_patch(_he1_is_from_patch) {}
+	EdgeEdgePair(TerrainEdgeData *_ed1, TerrainEdgeData *_ed2, bool _ed1_is_from_patch)
+        : ed1(_ed1), ed2(_ed2), ed1_is_from_patch(_ed1_is_from_patch) {}
 
     virtual Plane makePlane();
 
     virtual void print() {
-        std::cout << "edge-edge pair, ck: " << edge1_is_from_patch;
+		std::cout << "edge-edge pair, ed1:" << ed1 << ", ed2:" << ed2 << ", ck: " << ed1_is_from_patch;
     }
 };
 
@@ -102,7 +75,7 @@ class VertexTrianglePair : public CombinatorialPair
 {
 public:
     typedef Terrain::TerrainMesh::Vertex Vertex;
-    typedef Terrain::TerrainMesh::HalfEdge HalfEdge;
+	typedef Terrain::TerrainMesh::HalfEdge HalfEdge;
     typedef Terrain::TerrainMesh::Face Triangle;
 
     Vertex* pVertex;
@@ -115,7 +88,7 @@ public:
     virtual Plane makePlane();
 
     virtual void print() {
-        std::cout << "vertex-triangle pair, ck: " << tri_is_from_patch;
+        std::cout << "vertex-triangle pair, v:" << pVertex << ", t:" << pTriangle << ", ck: " << tri_is_from_patch;
     }
 };
 
@@ -138,20 +111,24 @@ public:
         VertexTrianglePair *p_pair = new VertexTrianglePair(v, tri, tri_is_from_patch);
         p_pair->insertPlane(m_plane_list);
 
-        //std::cout << "CS::insertPair(vh,fh,ck). ";
-        //p_pair->print();
-        //std::cout << std::endl;
+#ifdef DEBUG
+        std::cout << "CS::insertPair(vh,fh,ck). ";
+        p_pair->print();
+		std::cout << std::endl;
+#endif
 
         return p_pair;
     }
-    EdgeEdgePair *insertPair(TerrainHalfEdge *he1, TerrainHalfEdge *he2, bool he1_is_from_patch) {
+    EdgeEdgePair *insertPair(TerrainEdgeData *ed1, TerrainEdgeData *ed2, bool he1_is_from_patch) {
 
-        EdgeEdgePair *p_pair = new EdgeEdgePair(he1, he2, he1_is_from_patch);
+        EdgeEdgePair *p_pair = new EdgeEdgePair(ed1, ed2, he1_is_from_patch);
         p_pair->insertPlane(m_plane_list);
 
-        //std::cout << "CS::insertPair(e1,e2,ck). ";
-        //p_pair->print();
-        //std::cout << std::endl;
+#ifdef DEBUG
+        std::cout << "CS::insertPair(e1,e2,ck). ";
+        p_pair->print();
+        std::cout << std::endl;
+#endif
 
         return p_pair;
     }
@@ -160,9 +137,11 @@ public:
 
         p_pair->removePlane(m_plane_list);
 
-        //std::cout << "CS::removePair(p_pair). ";
-        //p_pair->print();
-        //std::cout << std::endl;
+#ifdef DEBUG
+        std::cout << "CS::removePair(p_pair). ";
+        p_pair->print();
+        std::cout << std::endl;
+#endif
 
         delete p_pair;
     }

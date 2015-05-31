@@ -2,12 +2,10 @@
 #include <iomanip>
 #include <ctime>
 
+#include "common.h"
 #include "terrain.h"
 #include "translationspacesubdivision.h"
 
-#ifdef _DEBUG
-	#define	DEBUG
-#endif
 
 int main(int argc, char **argv)
 {
@@ -141,17 +139,18 @@ int main(int argc, char **argv)
 	clock_t clock_IntervalStart = clock();
 #endif
 	do {
-		std::cerr << "\n<< Next Grid >>\n";
+		std::cerr << "\n<< Next Grid >>\n\n";
 		do {
 			//std::cin >> ch;
 #ifdef DEBUG
 			++numCellTraversed;
 			if (numCellTraversed % 1 == 0) {
 				clock_t clock_IntervalEnd = clock();
-				std::cerr << "\n== Cell " << numCellTraversed << " ==\n";
+				std::cerr << "== Cell " << numCellTraversed << " ==\n";
 				std::cerr << "Time elapsed : " << (double)(clock_IntervalEnd - clock_IntervalStart) / (double)CLOCKS_PER_SEC << '\n';
+				tss.printCSPlanes();
+				std::cerr << "====\n";
 				clock_IntervalStart = clock();
-				//tss.printCSPlanes();
 				//std::cerr << ".........." << std::endl;
 			}
 #endif

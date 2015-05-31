@@ -2,12 +2,6 @@
 
 #include <algorithm>
 
-#ifdef _DEBUG
-	#define DEBUG
-#endif
-
-//#define DEBUG
-
 SweepLine Arrangement::sweepLine;
 
 Arrangement *SweepLine::parent = NULL;
@@ -349,7 +343,7 @@ void Arrangement::insertTranslatedCopies()
 		double vertexScope_t2_rangeX_max = -cur_x_min + v_t1->getData().p.x;
 		double vertexScope_t2_rangeY_min = -cur_y_max + v_t1->getData().p.y;
 		double vertexScope_t2_rangeY_max = -cur_y_min + v_t1->getData().p.y;
-		t1->appendVerticesInRange(vertexScope_t2_rangeX_min, vertexScope_t2_rangeX_max, vertexScope_t2_rangeY_min, vertexScope_t2_rangeY_max, &vertexScope_t2);
+		t2->appendVerticesInRange(vertexScope_t2_rangeX_min, vertexScope_t2_rangeX_max, vertexScope_t2_rangeY_min, vertexScope_t2_rangeY_max, &vertexScope_t2);
 
 		// vertices in the window scope
 		unsigned int halfEdgesIdx_first = halfEdgesIdx;
@@ -549,6 +543,36 @@ void Arrangement::insertTranslatedCopies()
 	ed3WB->halfEdge_down = he3dWB;
 	ed4WB->halfEdge_up = he4uWB;
 	ed4WB->halfEdge_down = he4dWB;
+
+	// Take the firstHalfEdge of the current grid and that of the next grid.
+	if (cur_y_grid % 2 == 0) {
+		if (cur_x_grid == 0) { // first cell of the row
+			firstHalfEdge = he1dWB;
+			firstHalfEdge_next = he2uWB;
+		}
+		else if (cur_x_grid == x_gridSize - 1) { // last cell of the row
+			firstHalfEdge = he4uWB;
+			firstHalfEdge_next = he3dWB;
+		}
+		else {
+			firstHalfEdge = he4uWB;
+			firstHalfEdge_next = he2uWB;
+		}
+	}
+	else {
+		if (cur_x_grid == x_gridSize - 1) { // first cell of the row
+			firstHalfEdge = he1dWB;
+			firstHalfEdge_next = he4dWB;
+		}
+		else if (cur_x_grid == 0) { // last cell of the row
+			firstHalfEdge = he2dWB;
+			firstHalfEdge_next = he3dWB;
+		}
+		else {
+			firstHalfEdge = he2dWB;
+			firstHalfEdge_next = he4dWB;
+		}
+	}
 }
 
 void Arrangement::makeArrangement()
@@ -557,9 +581,35 @@ void Arrangement::makeArrangement()
 	sweepLine.initialize(this);
 	sweepLine.run();
 
+	// Erase outside-window structure.
+	for (unsigned int i = 0; i < vertices.size(); ++i) {
+		Vertex &v = vertices.at(i);
+		if (!isInWindow(v.getData().x, v.getData().y)) { // if the vertex is outside the window, erase adjacent structure.
+			EdgeIterator eit(&v);
+			while (eit.hasNext()) {
+				HalfEdge *he = eit.getNext();
+				HalfEdge *he_twin = he->getTwin();
+				VertexData &vd_twin = he_twin->getOrigin()->getData();
+
+				if (((nearlyEqual(vd_twin.x, cur_x_min) || nearlyEqual(vd_twin.x, cur_x_max)) && (cur_y_min <= vd_twin.y && vd_twin.y <= cur_y_max))
+					|| ((nearlyEqual(vd_twin.y, cur_y_min) || nearlyEqual(vd_twin.y, cur_y_max)) && (cur_x_min <= vd_twin.x && vd_twin.x <= cur_x_max))) {
+					// he_twin->origin is a boundary point, link the boundary structure.
+#ifdef DEBUG
+					if (he->getNext()->getOrigin() != he_twin->getOrigin())
+						std::cerr << "ERROR vertex : " << i << '\n';
+#endif
+					he->getNext()->setPrev(he_twin->getPrev());
+				}
+				deleteEdgeData(he->getData().edgeData - &edgeDataContainer[0]);
+				deleteHalfEdge(he->getTwin() - &halfEdges[0]);
+				deleteHalfEdge(he - &halfEdges[0]);
+			}
+			deleteVertex(i);
+		}
+	}
+
 	// Construct faces.
 	faces.reserve(number_of_edges() - number_of_vertices() + 2); // Euler's law. e - v + d(=2) = f
-	const HalfEdge *first_he = getFirstHalfEdge();
 	auto erased_heit = erasedHalfEdgesIndices.begin();
 	for (unsigned int i = 0; i < halfEdges.size(); ++i) {
 		if (erased_heit != erasedHalfEdgesIndices.end() && *erased_heit == i) { // discard the erased halfEdge.
@@ -578,7 +628,7 @@ void Arrangement::makeArrangement()
 						std::cout << "ERROR FACE : " << eit_he->getFace() - &faces[0] << '\n';
 #endif
 					eit_he->setFace(f);
-					if (first_he == eit_he) { // if he is firstHalfEdge, set this face to the outerface.
+					if (firstHalfEdge == eit_he) { // if he is firstHalfEdge, set this face to the outerface.
 						setOuterface(f);
 					}
 				}
@@ -606,26 +656,32 @@ bool ArrangementEdgeDataCompare::operator()(const ArrangementEdgeData *ed1, cons
 	
 	// Compare y-coordinate of the intersection with the sweepLine.
 	// (vd1R.y - vd1L.y) * (sx - vd1L.x) / (vd1R.x - vd1L.x) + vd1L.y = y1 > y2 = (vd2R.y - vd2L.y) * (sx - vd2L.x) / (vd2R.x - vd2L.x) + vd2L.y;
-	double comp_y = ((vd1R.y - vd1L.y) * (sx - vd1L.x) * (vd2R.x - vd2L.x) + vd1L.y * (vd1R.x - vd1L.x) * (vd2R.x - vd2L.x))
-				  - ((vd2R.y - vd2L.y) * (sx - vd2L.x) * (vd1R.x - vd1L.x) + vd2L.y * (vd1R.x - vd1L.x) * (vd2R.x - vd2L.x));
-
-	//if (comp_y == 0) {
-	//	// Compare slope
-	//	// (vd1R.y - vd1L.y) / (vd1R.x - vd1L.x) = s1 > s2 = (vd2R.y - vd2L.y) / (vd2R.x - vd2L.x)
-	//	double comp_s = (vd1R.y - vd1L.y) * (vd2R.x - vd2L.x) - (vd2R.y - vd2L.y) * (vd1R.x - vd1L.x);
-
-	//	//if (comp_s == 0) {
-	//	//	return ed1 > ed2; // not comparable. just distinguish.
-	//	//}
-	//	//else
-	//		return comp_s > 0;
-	//}
-	//else
-		return comp_y > 0;
+	if (vd1L.x == vd1R.x) { // if ed1 is vertical, the point is vd1L.
+		if (vd2L.x == vd2R.x) { // if ed2 is also vertical, the point is vd2L.
+			return vd1L.y > vd2L.y;
+		}
+		else {
+			double divisor = vd2R.x - vd2L.x;
+			return vd1L.y * divisor > (vd2R.y - vd2L.y) * (sx - vd2L.x) + vd2L.y * divisor;
+		}
+	}
+	else { 
+		if (vd2L.x == vd2R.x) {
+			double divisor = vd1R.x - vd1L.x;
+			return (vd1R.y - vd1L.y) * (sx - vd1L.x) + vd1L.y * divisor > vd2L.y * divisor;
+		}
+		else {
+			double divisor1 = vd1R.x - vd1L.x;
+			double divisor2 = vd2R.x - vd2L.x;
+			double divisor12 = divisor1 * divisor2;
+			return ((vd1R.y - vd1L.y) * (sx - vd1L.x) * divisor2 + vd1L.y * divisor12)
+				 > ((vd2R.y - vd2L.y) * (sx - vd2L.x) * divisor1 + vd2L.y * divisor12);
+		}
+	}
 }
 
 // ed2 was below ed1. ed2 will go up, and ed1 will go down relatively.
-bool SweepLine::handleProperIntersectionEvent(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2)
+bool SweepLine::handleIntersectionEvent(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2)
 {
 	//// check source
 	//for (unsigned int i = 0; i < ed1->sources.size(); ++i) {
@@ -679,18 +735,16 @@ bool SweepLine::handleProperIntersectionEvent(ArrangementEdgeData *ed1, Arrangem
 	 || (det < 0
 		&& ((x_range.first * det > x_det && x_det > x_range.second * det) ||
 			(y_range.first * det > y_det && y_det > y_range.second * det))))
-	{
-		// if two edges properly intersect, create new intersection event.
+	{ // if two edges properly intersect, create new intersection event.
 #ifdef DEBUG
-		std::cerr << "-- Intersection : (" << x_det / det << ',' << y_det / det << ") " << ed1 << ' ' << ed2 << '\n';
+			std::cerr << "-- Intersection : (" << x_det / det << ',' << y_det / det << ") " << ed1 << ' ' << ed2 << '\n';
 #endif
-		ArrangementVertex *v = updateDCELProperIntersection(ed1, ed2, x_det / det, y_det / det);
-		v->getData().it_eventQueue = events_insert(v);
-		return true;
+			ArrangementVertex *v = updateDCELProperIntersection(ed1, ed2, x_det / det, y_det / det);
+			v->getData().it_eventQueue = events_insert(v);
+			return true;
 	}
-	else { // if segments not intersect, return false.
-		return false;
-	}
+
+	return false;
 }
 
 // ed2 was below ed1. ed2 will go up, and ed1 will go down relatively.
@@ -1064,15 +1118,14 @@ void SweepLine::advance()
 		const Arrangement::VertexData vd = he->getTwin()->getOrigin()->getData();
 		ArrangementVector vec_edge = ArrangementVector(vd) - vec_v;
 
-		const double eps = 0.0000000000001;
-		if (vd.x < ep.v->getData().x - eps || (vd.x < ep.v->getData().x + eps && vd.y < ep.v->getData().y - eps))
+		if (vd < ep.v->getData())
 		{ // if he is the first before-event edge, set it to the first edge of before-edges.
 			if (BEedge == NULL || vec_edge.isLeftFrom(vec_edge_before_event)) {
 				BEedge = he;
 				vec_edge_before_event = vec_edge;
 			}
 		}
-		else if (vd.x > ep.v->getData().x + eps || (vd.x > ep.v->getData().x - eps && vd.y > ep.v->getData().y + eps)) { // if he is the first after-event edge, set it to the first edge of after-edges.
+		else if (ep.v->getData() < vd) { // if he is the first after-event edge, set it to the first edge of after-edges.
 			if (AEedge == NULL || vec_edge.isLeftFrom(vec_edge_after_event)) {
 				AEedge = he;
 				vec_edge_after_event = vec_edge;
@@ -1104,12 +1157,14 @@ void SweepLine::advance()
 	}
 	
 	// Erase mode. ¢Ä
+	EdgeDataBBTIterator bbt_entry; // remember the position that edges erased.
+	bbt_entry._Ptr = NULL;
 	if (BEedge != NULL) {
 
 		ep.v->setIncidentEdge(BEedge);
 		Arrangement::EdgeIterator BEeit(ep.v);
 		ArrangementHalfEdge *he = BEeit.getNext();
-		EdgeDataBBTIterator bbt_entry = he->getData().edgeData->it_edgeDataBBT;
+		bbt_entry = he->getData().edgeData->it_edgeDataBBT;
 		//bbt_entry = edgeDataBBT.upper_bound(BEedge->getData().edgeData);
 		do { // erase all the existing edges containing ep.v.
 			bbt_entry = edgeDataBBT_erase(he->getData().edgeData);
@@ -1120,7 +1175,7 @@ void SweepLine::advance()
 			// if erased edge is not the highest or the lowest and there is no edges to be continuously inserted, check intersection event.
 			ArrangementEdgeData *ed1 = *bbt_entry;
 			ArrangementEdgeData *ed2 = *--bbt_entry;
-			handleProperIntersectionEvent(ed2, ed1);
+			handleIntersectionEvent(ed2, ed1);
 		}
 	}
 
@@ -1148,7 +1203,11 @@ void SweepLine::advance()
 		//}
 		EdgeDataBBTIterator inserted_lowerbound, inserted_upperbound;
 		bool after_first = false;
-		EdgeDataBBTIterator hintit = edgeDataBBT.upper_bound(he->getData().edgeData);
+		EdgeDataBBTIterator hintit;
+		if (bbt_entry._Ptr == NULL)
+			hintit = edgeDataBBT.upper_bound(he->getData().edgeData);
+		else
+			hintit = bbt_entry;
 		do { // insert only when he does not reach to BEedge or AEedge yet.
 			EdgeDataBBTIterator hintit_prev = hintit;
 			EdgeDataBBTIterator inserted_it = edgeDataBBT_insert(hintit, he->getData().edgeData);
@@ -1166,19 +1225,14 @@ void SweepLine::advance()
 		// handle intersection with lower neighbor and higher neighbor
 		if (inserted_lowerbound != edgeDataBBT.begin()) { // if it is not the lowest, check intersection with the lower neighbor.
 			EdgeDataBBTIterator it_low = inserted_lowerbound;
-			handleProperIntersectionEvent(*--it_low, *inserted_lowerbound);
+			handleIntersectionEvent(*--it_low, *inserted_lowerbound);
 		}
 		if (inserted_upperbound != --edgeDataBBT.end()) { // if it is not the highest, check intersection with the higher neighbor.
 			EdgeDataBBTIterator it_high = inserted_upperbound;
-			handleProperIntersectionEvent(*inserted_upperbound, *++it_high);
+			handleIntersectionEvent(*inserted_upperbound, *++it_high);
 		}
 	}
-
-	if (firstEvent) {
-		parent->setFirstHalfEdge((*edgeDataBBT.begin())->halfEdge_up);
-		firstEvent = false;
-	}
-
+	
 #ifdef DEBUG
 	std::cerr << "Insert mode done.\n";
 	it_debug = edgeDataBBT.begin();

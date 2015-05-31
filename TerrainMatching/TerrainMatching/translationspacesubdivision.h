@@ -21,6 +21,7 @@ class TranslationSpaceSubdivision
 	std::stack<Arrangement::HalfEdge*> m_he_stack; // stack for DFS
 	std::stack<Arrangement::HalfEdge*> m_he_path; // path from the root
     CombinatorialStructure m_CS;
+	CombinatorialStructure nextGrid_CS; // remember CS for the next grid
     std::vector<bool *> m_checked_plist; // pointers to checked
 
     // private function

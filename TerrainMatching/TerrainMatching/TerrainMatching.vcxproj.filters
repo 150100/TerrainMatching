@@ -66,6 +66,9 @@
     <ClInclude Include="DCEL\WavefrontObjImporter.h">
       <Filter>DCEL</Filter>
     </ClInclude>
+    <ClInclude Include="common.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="arrangement.cpp">

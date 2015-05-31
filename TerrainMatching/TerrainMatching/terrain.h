@@ -13,6 +13,7 @@
 #include <fstream>
 #include <limits>
 
+#include "common.h"
 #include "plane.h"
 
 ///
@@ -75,6 +76,8 @@ class TerrainEdgeData
 public:
     bool check_removed;
     std::list<EdgeEdgePair *> EEpair_list; // paired one while translating
+	HalfEdgeT<TerrainVertexData, TerrainHalfEdgeData, TerrainFaceData>
+		*halfEdge_up, *halfEdge_down;
 
     TerrainEdgeData() : check_removed(false) {}
 };

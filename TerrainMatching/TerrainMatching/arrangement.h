@@ -10,6 +10,8 @@
 #include <functional>
 #include <iomanip>
 
+#include "common.h"
+#include "numbertype.h"
 #include "terrain.h"
 
 ///
@@ -34,7 +36,10 @@ public:
 	ArrangementVertexData(Terrain::VertexData &tvd) { x = tvd.p.x; y = tvd.p.y; }
 
 	inline bool operator< (const ArrangementVertexData &vd) const {
-		return x < vd.x || (x == vd.x && y < vd.y); // lexicographical ordering
+		const double eps = 0.0000000000001;
+		std::pair<double, double> vd_x_eps = std::minmax(vd.x * (1 - eps), vd.x * (1 + eps));
+		double vd_y_epsmin = std::min(vd.y * (1 - eps), vd.y * (1 + eps));
+		return x < vd_x_eps.first || (x < vd_x_eps.second && y < vd_y_epsmin); // lexicographical ordering considering floating-point error.
 	}
 	inline bool operator== (const ArrangementVertexData &vd) const {
 		return x == vd.x && y == vd.y;
@@ -181,29 +186,35 @@ public:
 
 	// A point is in the window?
 	inline bool isInWindow(double x, double y) {
-		return cur_x_min <= x && x <= cur_x_max && cur_y_min <= y && y <= cur_y_max;
+		return nearlyInRange(x, cur_x_min, cur_x_max) 
+			&& nearlyInRange(y, cur_y_min, cur_y_max);
+	}
+
+	// Is he is the firstHalfEdge of the next grid?
+	inline bool isNextFirstHalfEdge(HalfEdge *he) {
+		return he == firstHalfEdge_next;
 	}
 
 	// Get the outerface.
 	inline Face* getOuterface() {
-		return &faces.at(outerface);
+		return outerface;
 	}
 	// Set the outerface. (Set firstHalfEdge first.)
 	inline void setOuterface(Face *f) {
-		outerface = f - &faces[0];
+		outerface = f;
 		f->getData().state = FaceData::OUTERFACE;
 #ifdef _DEBUG
-		if (&faces[outerface] != halfEdges[firstHalfEdge].getFace())
+		if (outerface != firstHalfEdge->getFace())
 			throw cpp::Exception("Outerface should be an adjacent face of firstHalfEdge.");
 #endif
 	}
 	// Get a halfedge whose adjacent face is outerface.
 	inline HalfEdge* getFirstHalfEdge() {
-		return &halfEdges.at(firstHalfEdge);
+		return firstHalfEdge;
 	}
 	// Set the halfedge whose adjacent face is outerface.
 	inline void setFirstHalfEdge(HalfEdge *he) {
-		firstHalfEdge = he - &halfEdges[0];
+		firstHalfEdge = he;
 	}
 	// Test emptiness
 	inline bool isEmpty() { return vertices.empty(); }
@@ -320,8 +331,9 @@ public:
 	}
 
 private:
-	unsigned int firstHalfEdge;
-	unsigned int outerface;
+	HalfEdge *firstHalfEdge;
+	HalfEdge *firstHalfEdge_next; // This information is used to remember an initial CS for the next cell.
+	Face *outerface;
 	static SweepLine sweepLine;
 
 };
@@ -410,7 +422,7 @@ private:
 		ed->it_edgeDataBBT._Ptr = NULL;
 	}
 
-	static bool handleProperIntersectionEvent(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2);
+	static bool handleIntersectionEvent(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2);
 	static ArrangementVertex* updateDCELProperIntersection(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2, double int_x, double int_y);
 	static ArrangementEdgeData* updateDCELVertexEdgeIntersection(ArrangementVertex *v, ArrangementEdgeData *ed);
 	static void updateDCEL2VertexIntersection(ArrangementVertex *v, ArrangementVertex *v_erase);

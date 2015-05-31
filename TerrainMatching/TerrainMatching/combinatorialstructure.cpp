@@ -276,13 +276,13 @@ void CombinatorialStructure::printPlanes()
 
 Plane EdgeEdgePair::makePlane()
 {
-    Point &a_1 = edge1.he->getOrigin()->getData().p;
-    Point &a_2 = edge1.he->getTwin()->getOrigin()->getData().p;
-    Point &b_1 = edge2.he->getOrigin()->getData().p;
-    Point &b_2 = edge2.he->getTwin()->getOrigin()->getData().p;
+    Point &a_1 = ed1->halfEdge_up->getOrigin()->getData().p;
+	Point &a_2 = ed1->halfEdge_down->getOrigin()->getData().p;
+	Point &b_1 = ed2->halfEdge_up->getOrigin()->getData().p;
+	Point &b_2 = ed2->halfEdge_down->getOrigin()->getData().p;
 
     Plane p;
-    if (edge1_is_from_patch)
+    if (ed1_is_from_patch)
        p.setPlane_EEpair(a_1, a_2, b_1, b_2, 1);
     else
        p.setPlane_EEpair(a_1, a_2, b_1, b_2, -1);

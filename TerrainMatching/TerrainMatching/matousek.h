@@ -15,6 +15,7 @@
 #include <list>
 #include <vector>
 #include <math.h>
+
 #include "plane.h"
 
 //basis computation에서 사용하는 리턴타입. location 이 upper envelope과 lower envelope의 vertical distance가 최소가 되는점 (x,y,z)이고 distance가 그때의 거리. (점에서 envelope까지의 거리)

@@ -138,48 +138,58 @@ int main(int argc, char **argv)
 #ifdef DEBUG
 	clock_t clock_IntervalStart = clock();
 #endif
-	do {
-		std::cerr << "\n<< Next Grid >>\n\n";
-		do {
-			//std::cin >> ch;
-#ifdef DEBUG
-			++numCellTraversed;
-			if (numCellTraversed % 1 == 0) {
-				clock_t clock_IntervalEnd = clock();
-				std::cerr << "== Cell " << numCellTraversed << " ==\n";
-				std::cerr << "Time elapsed : " << (double)(clock_IntervalEnd - clock_IntervalStart) / (double)CLOCKS_PER_SEC << '\n';
-				tss.printCSPlanes();
-				std::cerr << "====\n";
-				clock_IntervalStart = clock();
-				//std::cerr << ".........." << std::endl;
-			}
-#endif
-			bool success = tss.solveLP(local_optimal);
 
-			if (success) {
+	try {
+		do {
+			std::cerr << "\n<< Next Grid >>\n\n";
+			do {
+				//std::cin >> ch;
 #ifdef DEBUG
-				if (local_optimal.distance < 0) {
-					std::cerr << "ERROR: distance < 0" << std::endl;
-					std::cerr << "Cell " << numCellTraversed << std::endl;
-					std::cerr << "distance=" << local_optimal.distance << std::endl;
-					//tss.printCSPlanes();
-					char c;
-					std::cin >> c;
-					continue;
-				}
-				else if (local_optimal.distance == 0) {
-					std::cerr << "WARNING: distance == 0\n";
+				++numCellTraversed;
+				if (numCellTraversed % 1 == 0) {
+					clock_t clock_IntervalEnd = clock();
+					std::cerr << "== Cell " << numCellTraversed << " ==\n";
+					std::cerr << "Time elapsed : " << (double)(clock_IntervalEnd - clock_IntervalStart) / (double)CLOCKS_PER_SEC << '\n';
+					tss.printCSPlanes();
+					std::cerr << "====\n";
+					clock_IntervalStart = clock();
+					//std::cerr << ".........." << std::endl;
 				}
 #endif
-				if (first) {
-					first = false;
-					global_optimal = local_optimal;
+				bool success = tss.solveLP(local_optimal);
+
+				if (success) {
+#ifdef DEBUG
+					if (local_optimal.distance < 0) {
+						std::cerr << "ERROR: distance < 0" << std::endl;
+						std::cerr << "Cell " << numCellTraversed << std::endl;
+						std::cerr << "distance=" << local_optimal.distance << std::endl;
+						//tss.printCSPlanes();
+						char c;
+						std::cin >> c;
+						continue;
+					}
+					else if (local_optimal.distance == 0) {
+						std::cerr << "WARNING: distance == 0\n";
+					}
+#endif
+					if (first) {
+						first = false;
+						global_optimal = local_optimal;
+					}
+					else if (local_optimal.distance < global_optimal.distance)
+						global_optimal = local_optimal;
 				}
-				else if (local_optimal.distance < global_optimal.distance)
-					global_optimal = local_optimal;
-			}
-		} while (tss.advanceDFS() == DFS_ADVANCED);
-	} while (tss.advanceGridCell() == GridCellSearch_ADVANCED);
+			} while (tss.advanceDFS() == DFS_ADVANCED);
+		} while (tss.advanceGridCell() == GridCellSearch_ADVANCED);
+
+	}
+	catch (std::exception& e) {
+		std::cerr << "An exception occurred: " << e.what() << std::endl;
+		std::cin.sync();
+		std::cin.get();
+		return 1;
+	}
 
 	clock_t clock_TraversalEnd = clock();
 

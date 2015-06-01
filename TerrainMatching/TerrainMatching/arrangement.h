@@ -35,14 +35,14 @@ public:
 	ArrangementVertexData() { x = 0; y = 0; it_eventQueue._Ptr = NULL; }
 	ArrangementVertexData(Terrain::VertexData &tvd) { x = tvd.p.x; y = tvd.p.y; }
 
-	inline bool operator< (const ArrangementVertexData &vd) const {
+	inline bool operator< (const ArrangementVertexData &vd) const { // two points should not be "very close".
 		const double eps = 0.0000000000001;
 		std::pair<double, double> vd_x_eps = std::minmax(vd.x * (1 - eps), vd.x * (1 + eps));
 		double vd_y_epsmin = std::min(vd.y * (1 - eps), vd.y * (1 + eps));
 		return x < vd_x_eps.first || (x < vd_x_eps.second && y < vd_y_epsmin); // lexicographical ordering considering floating-point error.
 	}
 	inline bool operator== (const ArrangementVertexData &vd) const {
-		return x == vd.x && y == vd.y;
+		return nearlyEqual(x, vd.x) && nearlyEqual(y, vd.y);
 	}
 
 	inline void print(std::ostream &os) {
@@ -186,8 +186,8 @@ public:
 
 	// A point is in the window?
 	inline bool isInWindow(double x, double y) {
-		return nearlyInRange(x, cur_x_min, cur_x_max) 
-			&& nearlyInRange(y, cur_y_min, cur_y_max);
+		return nearlyInClosedRange(x, cur_x_min, cur_x_max)
+			&& nearlyInClosedRange(y, cur_y_min, cur_y_max);
 	}
 
 	// Is he is the firstHalfEdge of the next grid?
@@ -418,11 +418,13 @@ private:
 		return it;
 	}
 	static EdgeDataBBTIterator edgeDataBBT_erase(ArrangementEdgeData *ed) {
-		return edgeDataBBT.erase(ed->it_edgeDataBBT);
+		EdgeDataBBTIterator ret = edgeDataBBT.erase(ed->it_edgeDataBBT);
 		ed->it_edgeDataBBT._Ptr = NULL;
+		return ret;
 	}
 
-	static bool handleIntersectionEvent(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2);
+	static ArrangementVertex* handleIntersectionEvent(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2);
+	static ArrangementVertex* updateDCELIntersection(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2, double int_x, double int_y);
 	static ArrangementVertex* updateDCELProperIntersection(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2, double int_x, double int_y);
 	static ArrangementEdgeData* updateDCELVertexEdgeIntersection(ArrangementVertex *v, ArrangementEdgeData *ed);
 	static void updateDCEL2VertexIntersection(ArrangementVertex *v, ArrangementVertex *v_erase);

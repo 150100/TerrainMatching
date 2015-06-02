@@ -1033,17 +1033,25 @@ void SweepLine::updateDCEL2VertexIntersection(ArrangementVertex *v, ArrangementV
 		// twin-edge handling (prev and he)
 		ArrangementVector vec_he_prev = ArrangementVector(he_prev->getTwin()->getOrigin()->getData()) - vec_v;
 		ArrangementVector vec_he_next = ArrangementVector(he_next->getTwin()->getOrigin()->getData()) - vec_v;
-		if (vec_he_prev.det(vec_he_next) == 0 &&
-			vec_he_prev > vec_zero && vec_he_next > vec_zero) { // if prev and he have the same forward direction, merge them as a twin-edge.
-			updateDCELTwinEdgeWithOneSharedVertex(he_prev, he_next); // he_prev will survive.
-			if (incidentHalfEdges_v_del.empty()) { // erase v_del (lazy)
-				unsigned int id = v_del - &(parent->vertices[0]);
-				parent->deleteVertex(id);
-				events_erase(v_del);
-				return;
+		if (vec_he_prev.det(vec_he_next) == 0) { // if prev and he have the same bi-direction,
+			if (vec_he_prev > vec_zero && vec_he_next > vec_zero) { // if prev and he have the same forward direction, merge them as a twin-edge.
+				updateDCELTwinEdgeWithOneSharedVertex(he_prev, he_next); // he_prev will survive.
+
+				if (incidentHalfEdges_v_del.empty()) // if there is no other edge, escape.
+					break;
+				else // if there is another edge, continue to find.
+					he_next = NULL;
 			}
-			else {
-				he_next = NULL;
+			else if (vec_zero > vec_he_prev && vec_zero > vec_he_next) { // if prev and he have the same backward direction, consider them as a twin-edge.
+				// link he to v after he_prev
+				he->setPrev(he_prev->getTwin());
+				he->getTwin()->setNext(he_prev);
+				he->setOrigin(v);
+
+				if (incidentHalfEdges_v_del.empty()) // if there is no other edge, escape.
+					break;
+				else // if there is another edge, continue to find.
+					he_next = NULL;
 			}
 		}
 	}

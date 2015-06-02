@@ -36,10 +36,8 @@ public:
 	ArrangementVertexData(Terrain::VertexData &tvd) { x = tvd.p.x; y = tvd.p.y; }
 
 	inline bool operator< (const ArrangementVertexData &vd) const { // two points should not be "very close".
-		const double eps = 0.0000000000001;
-		std::pair<double, double> vd_x_eps = std::minmax(vd.x * (1 - eps), vd.x * (1 + eps));
-		double vd_y_epsmin = std::min(vd.y * (1 - eps), vd.y * (1 + eps));
-		return x < vd_x_eps.first || (x < vd_x_eps.second && y < vd_y_epsmin); // lexicographical ordering considering floating-point error.
+		const double eps = 0.00000000001;
+		return x < vd.x - eps || (x < vd.x + eps && y < vd.y - eps); // lexicographical ordering considering floating-point error.
 	}
 	inline bool operator== (const ArrangementVertexData &vd) const {
 		return nearlyEqual(x, vd.x) && nearlyEqual(y, vd.y);

@@ -723,19 +723,19 @@ bool ArrangementEdgeDataCompare::operator()(const ArrangementEdgeData *ed1, cons
 	
 	// Compare y-coordinate of the intersection with the sweepLine.
 	// (vd1R.y - vd1L.y) * (sx - vd1L.x) / (vd1R.x - vd1L.x) + vd1L.y = y1 > y2 = (vd2R.y - vd2L.y) * (sx - vd2L.x) / (vd2R.x - vd2L.x) + vd2L.y;
-	if (vd1L.x == vd1R.x) { // if ed1 is vertical, the point is vd1L.
-		if (vd2L.x == vd2R.x) { // if ed2 is also vertical, the point is vd2L.
-			return vd1L.y > vd2L.y;
+	if (vd1L.x == vd1R.x) { // if ed1 is vertical, consider as range.
+		if (vd2L.x == vd2R.x) { // if ed2 is also vertical, consider as range.
+			return vd1L.y > vd2R.y; // vd1L.y < vd1R.y and vd2L.y < vd2R.y, so y1 strictly larger than y2 is equivalent to ...
 		}
 		else {
 			double divisor = vd2R.x - vd2L.x;
-			return vd1L.y * divisor > (vd2R.y - vd2L.y) * (sx - vd2L.x) + vd2L.y * divisor;
+			return vd1L.y * divisor > (vd2R.y - vd2L.y) * (sx - vd2L.x) + vd2L.y * divisor; // vd1L.y < vd1R.y, so y1 strictly larger than y2 is equivalent to ...
 		}
 	}
 	else { 
 		if (vd2L.x == vd2R.x) {
 			double divisor = vd1R.x - vd1L.x;
-			return (vd1R.y - vd1L.y) * (sx - vd1L.x) + vd1L.y * divisor > vd2L.y * divisor;
+			return (vd1R.y - vd1L.y) * (sx - vd1L.x) + vd1L.y * divisor > vd2R.y * divisor; // vd2L.y < vd2R.y, so y1 strictly larger than y2 is equivalent to ...
 		}
 		else {
 			double divisor1 = vd1R.x - vd1L.x;
@@ -803,7 +803,7 @@ Arrangement::Vertex* SweepLine::handleIntersectionEvent(ArrangementEdgeData *ed1
 #ifdef DEBUG
 		std::cerr << "-- Intersection :" << v << " (" << x_det / det << ',' << y_det / det << ") " << ed1 << ' ' << ed2 << '\n';
 #endif
-		if (currentEvent->v->getData() < v->getData())
+		//if (currentEvent->v->getData() < v->getData())
 			v->getData().it_eventQueue = events_insert(v);
 		return v;
 	}
@@ -831,7 +831,7 @@ SweepLine::updateDCELIntersection(ArrangementEdgeData *ed1, ArrangementEdgeData 
 			throw cpp::Exception("twin-vertex should be handled before.");
 		else {
 			ArrangementVertex *v = ed1->halfEdge_up->getOrigin();
-			updateDCELVertexEdgeIntersection(v, ed2);
+			updateDCELVertexEdgeIntersection(v, ed2, true);
 			return v;
 		}
 	}
@@ -842,7 +842,7 @@ SweepLine::updateDCELIntersection(ArrangementEdgeData *ed1, ArrangementEdgeData 
 			throw cpp::Exception("twin-vertex should be handled before.");
 		else {
 			ArrangementVertex *v = ed1->halfEdge_down->getOrigin();
-			updateDCELVertexEdgeIntersection(v, ed2);
+			updateDCELVertexEdgeIntersection(v, ed2, true);
 			return v;
 		}
 	}
@@ -853,7 +853,7 @@ SweepLine::updateDCELIntersection(ArrangementEdgeData *ed1, ArrangementEdgeData 
 			throw cpp::Exception("twin-vertex should be handled before.");
 		else {
 			ArrangementVertex *v = ed2->halfEdge_up->getOrigin();
-			updateDCELVertexEdgeIntersection(v, ed1);
+			updateDCELVertexEdgeIntersection(v, ed1, true);
 			return v;
 		}
 	}
@@ -864,7 +864,7 @@ SweepLine::updateDCELIntersection(ArrangementEdgeData *ed1, ArrangementEdgeData 
 			throw cpp::Exception("twin-vertex should be handled before.");
 		else {
 			ArrangementVertex *v = ed2->halfEdge_down->getOrigin();
-			updateDCELVertexEdgeIntersection(v, ed1);
+			updateDCELVertexEdgeIntersection(v, ed1, true);
 			return v;
 		}
 	}
@@ -916,7 +916,7 @@ SweepLine::updateDCELProperIntersection(ArrangementEdgeData *ed1, ArrangementEdg
 	v_int->setIncidentEdge(ed1Nu);
 
 	// merge v_int to the edge ed2
-	updateDCELVertexEdgeIntersection(v_int, ed2);
+	updateDCELVertexEdgeIntersection(v_int, ed2, true);
 
 	// returns v_int
 	return v_int;
@@ -924,7 +924,7 @@ SweepLine::updateDCELProperIntersection(ArrangementEdgeData *ed1, ArrangementEdg
 
 // returns edN
 ArrangementEdgeData *
-SweepLine::updateDCELVertexEdgeIntersection(ArrangementVertex *v, ArrangementEdgeData *ed)
+SweepLine::updateDCELVertexEdgeIntersection(ArrangementVertex *v, ArrangementEdgeData *ed, bool survive_v)
 {
 	/*
 			  v_dummy			   v¦¢				 edu  v¦¢  edNu
@@ -949,6 +949,8 @@ SweepLine::updateDCELVertexEdgeIntersection(ArrangementVertex *v, ArrangementEdg
 		throw cpp::Exception("ed -> v -> edN");*/
 
 	for (unsigned int i = 0; i < parent->halfEdges.size(); ++i) {
+		if (parent->erasedHalfEdgesIndices.find(i) != parent->erasedHalfEdgesIndices.end())
+			continue;
 		if (parent->halfEdges[i].getOrigin() == v_dummy)
 			std::cerr << "ERROR : " << i << '\n';
 	}
@@ -975,7 +977,12 @@ SweepLine::updateDCELVertexEdgeIntersection(ArrangementVertex *v, ArrangementEdg
 	v_dummy->setIncidentEdge(edNu);
 
 	// merge v_dummy to v
-	updateDCEL2VertexIntersection(v, v_dummy);
+	if (survive_v)
+		updateDCEL2VertexIntersection(v, v_dummy);
+	else {
+		updateDCEL2VertexIntersection(v_dummy, v); // event of v will be deleted
+		events_insert(v_dummy); // newly insert event
+	}
 
 	return edN;
 }
@@ -1099,8 +1106,8 @@ void SweepLine::updateDCEL2VertexIntersection(ArrangementVertex *v, ArrangementV
 				he->setOrigin(v);
 
 				// twin-edge handling (prev and he)
-				if (vec_he_prev.det(vec_he) == 0 && 
-					vec_he_prev > vec_zero && vec_he > vec_zero) { // if prev and he have the same forward direction, merge them as a twin-edge.
+				if (vec_he_prev.det(vec_he) == 0
+					&& vec_he_prev > vec_zero && vec_he > vec_zero) { // if prev and he have the same forward direction, merge them as a twin-edge.
 					updateDCELTwinEdgeWithOneSharedVertex(he_prev, he); // he_prev will survive.
 				}
 				else { // set insert edge as the "prev"
@@ -1127,6 +1134,8 @@ void SweepLine::updateDCEL2VertexIntersection(ArrangementVertex *v, ArrangementV
 	//std::cerr << '\n';
 
 	for (unsigned int i = 0; i < parent->halfEdges.size(); ++i) {
+		if (parent->erasedHalfEdgesIndices.find(i) != parent->erasedHalfEdgesIndices.end())
+			continue;
 		if (parent->halfEdges[i].getOrigin() == v_del)
 			std::cerr << "ERROR : " << i << '\n';
 	}
@@ -1150,11 +1159,11 @@ void SweepLine::updateDCELTwinEdgeWithOneSharedVertex(ArrangementHalfEdge *he_pr
 #endif
 
 	// link he_prev and he_next at the endpoint of the twin-edge.
-	if (he_prev->getTwin()->getOrigin()->getData() < he_next->getTwin()->getOrigin()->getData()) { // if *inserted_it is shorter than he
-		updateDCELVertexEdgeIntersection(he_prev->getTwin()->getOrigin(), he_next->getData().edgeData);
+	if (he_prev->getTwin()->getOrigin()->getData() < he_next->getTwin()->getOrigin()->getData()) { // if he_prev is shorter than he_next
+		updateDCELVertexEdgeIntersection(he_prev->getTwin()->getOrigin(), he_next->getData().edgeData, false);
 	}
-	else if (he_next->getTwin()->getOrigin()->getData() < he_prev->getTwin()->getOrigin()->getData()) { // if he is shorter than *inserted_it
-		updateDCELVertexEdgeIntersection(he_next->getTwin()->getOrigin(), he_prev->getData().edgeData);
+	else if (he_next->getTwin()->getOrigin()->getData() < he_prev->getTwin()->getOrigin()->getData()) { // if he_next is shorter than he_prev
+		updateDCELVertexEdgeIntersection(he_next->getTwin()->getOrigin(), he_prev->getData().edgeData, true);
 	}
 	else { // if *inserted_it and he are the same, merge them at the twin-vertex
 		updateDCEL2VertexIntersection(he_next->getTwin()->getOrigin(), he_prev->getTwin()->getOrigin());
@@ -1163,8 +1172,8 @@ void SweepLine::updateDCELTwinEdgeWithOneSharedVertex(ArrangementHalfEdge *he_pr
 	// merge two edges to one twin-edge.
 	updateDCELTwinEdgeWithTwoSharedVertex(he_prev, he_next);
 
-	// unlink he_next from the endpoint of twin-edge.
-	he_prev->getTwin()->setNext(he_next->getTwin()->getNext());
+	//// unlink he_next from the endpoint of twin-edge.
+	//he_prev->getTwin()->setNext(he_next->getTwin()->getNext());
 }
 
 // he_prev->twin->next == he_next.
@@ -1222,25 +1231,36 @@ void SweepLine::initialize(Arrangement *_parent)
 void SweepLine::advance()
 {
 	// Take the first event
-	Event ep;
-	do { // take event point only when the location meets. (they can unmatch because of deletion and insertion of vertices)
-		ep = events_popfront();
-	} while (ep.x != ep.v->getData().x || ep.y != ep.v->getData().y);
+	Event ep = events_popfront();
 	++eventCount;
 	currentEvent = &ep;
 
 #ifdef DEBUG
 	std::cerr << "================== Event " << eventCount << " ======================\n";
-	std::cerr << "ep = (" << ep.x << ',' << ep.y << ')' << ep.v << "\n";
+	std::cerr << "ep = (" << ep.v->getData().x << ',' << ep.v->getData().y << ')' << ep.v << "\n";
 #endif
 
 	// while two event points have the same position, merge the point to ep.
-	while (!events.empty() && events.begin()->x == ep.x && events.begin()->y == ep.y) {
+	while (!events.empty() 
+		&& events.begin()->v->getData().x == ep.v->getData().x 
+		&& events.begin()->v->getData().y == ep.v->getData().y) {
 		Event ep_next = events_popfront();
 #ifdef DEBUG
-		std::cerr << "ep_next = (" << ep_next.x << ',' << ep_next.y << ')' << ep_next.v << "\n";
+		std::cerr << "ep_next = (" << ep_next.v->getData().x << ',' << ep_next.v->getData().y << ')' << ep_next.v << "\n";
 #endif
 		updateDCEL2VertexIntersection(ep.v, ep_next.v);
+	}
+
+	// merge edges that passes ep.
+	ArrangementEdgeData sample_zero_ep; // an edge of ep.v -> ep.v
+	sample_zero_ep.halfEdge_up = ep.v->getIncidentEdge();
+	sample_zero_ep.halfEdge_down = ep.v->getIncidentEdge();
+	auto eqRange = edgeDataBBT.equal_range(&sample_zero_ep);
+	for (auto eqRange_it = eqRange.first; eqRange_it != eqRange.second; ++eqRange_it) {
+		ArrangementEdgeData *ed = *eqRange_it;
+		if (ed->halfEdge_up->getOrigin() != ep.v && ed->halfEdge_down->getOrigin() != ep.v) { // not a ep.v edge
+			updateDCELVertexEdgeIntersection(ep.v, ed, true);
+		}
 	}
 
 #ifdef DEBUG
@@ -1314,27 +1334,27 @@ void SweepLine::advance()
 	//}
 
 	// Erase mode. ¢Ä
-		EdgeDataBBTIterator bbt_entry; // remember the position that edges erased.
-		bbt_entry._Ptr = NULL;
-		if (BEedge != NULL) {
+	EdgeDataBBTIterator bbt_entry; // remember the position that edges erased.
+	bbt_entry._Ptr = NULL;
+	if (BEedge != NULL) {
 
-			ep.v->setIncidentEdge(BEedge);
-			Arrangement::EdgeIterator BEeit(ep.v);
-			ArrangementHalfEdge *he = BEeit.getNext();
-			bbt_entry = he->getData().edgeData->it_edgeDataBBT;
-			//bbt_entry = edgeDataBBT.upper_bound(BEedge->getData().edgeData);
-			do { // erase all the existing edges containing ep.v.
-				bbt_entry = edgeDataBBT_erase(he->getData().edgeData);
-				he = BEeit.getNext();
-			} while (he != AEedge && he != BEedge);
+		ep.v->setIncidentEdge(BEedge);
+		Arrangement::EdgeIterator BEeit(ep.v);
+		ArrangementHalfEdge *he = BEeit.getNext();
+		bbt_entry = he->getData().edgeData->it_edgeDataBBT;
+		//bbt_entry = edgeDataBBT.upper_bound(BEedge->getData().edgeData);
+		do { // erase all the existing edges containing ep.v.
+			bbt_entry = edgeDataBBT_erase(he->getData().edgeData);
+			he = BEeit.getNext();
+		} while (he != AEedge && he != BEedge);
 
-			if (AEedge == NULL && bbt_entry != edgeDataBBT.end() && bbt_entry != edgeDataBBT.begin()) {
-				// if erased edge is not the highest or the lowest and there is no edges to be continuously inserted, check intersection event.
-				ArrangementEdgeData *ed1 = *bbt_entry;
-				ArrangementEdgeData *ed2 = *--bbt_entry;
-				handleIntersectionEvent(ed2, ed1);
-			}
+		if (AEedge == NULL && bbt_entry != edgeDataBBT.end() && bbt_entry != edgeDataBBT.begin()) {
+			// if erased edge is not the highest or the lowest and there is no edges to be continuously inserted, check intersection event.
+			ArrangementEdgeData *ed1 = *bbt_entry;
+			ArrangementEdgeData *ed2 = *--bbt_entry;
+			handleIntersectionEvent(ed2, ed1);
 		}
+	}
 
 #ifdef DEBUG
 	std::cerr << "Erase mode done.\n";
@@ -1383,7 +1403,6 @@ void SweepLine::advance()
 		if (inserted_lowerbound != edgeDataBBT.begin()) { // if it is not the lowest, check intersection with the lower neighbor.
 			EdgeDataBBTIterator it_above = inserted_lowerbound;
 			if (ep.v == handleIntersectionEvent(*--it_above, *inserted_lowerbound)) { // if it_above passes ep.v,
-				// see all edges and update.
 				throw cpp::Exception("Cannot be done. (it_above passes ep.v)");
 			}
 		}

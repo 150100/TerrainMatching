@@ -345,17 +345,14 @@ public:
 	typedef Arrangement::Vertex ArrangementVertex;
 
 	ArrangementVertex *v;
-	double x, y;
 
 	Event() {}
 	Event(ArrangementVertex *_v) {
 		v = _v;
-		x = v->getData().x;
-		y = v->getData().y;
 	}
 
 	bool operator<(const Event &ep) const {
-		return x < ep.x || (x == ep.x && y < ep.y); // lexicographical ordering
+		return v->getData() < ep.v->getData();
 	}
 };
 
@@ -426,7 +423,7 @@ private:
 	static ArrangementVertex* handleIntersectionEvent(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2);
 	static ArrangementVertex* updateDCELIntersection(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2, double int_x, double int_y);
 	static ArrangementVertex* updateDCELProperIntersection(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2, double int_x, double int_y);
-	static ArrangementEdgeData* updateDCELVertexEdgeIntersection(ArrangementVertex *v, ArrangementEdgeData *ed);
+	static ArrangementEdgeData* updateDCELVertexEdgeIntersection(ArrangementVertex *v, ArrangementEdgeData *ed, bool survive_v);
 	static void updateDCEL2VertexIntersection(ArrangementVertex *v, ArrangementVertex *v_erase);
 	static void updateDCELTwinEdgeWithOneSharedVertex(ArrangementHalfEdge *he_prev, ArrangementHalfEdge *he_next);
 	static void updateDCELTwinEdgeWithTwoSharedVertex(ArrangementHalfEdge *he_prev, ArrangementHalfEdge *he_next);
@@ -436,7 +433,7 @@ public:
 
 	static inline void initialize(Arrangement *_parent);
 
-	static inline double getX() { return currentEvent->x; }
+	static inline double getX() { return currentEvent->v->getData().x; }
 
 	static void advance();
 	static inline void run()

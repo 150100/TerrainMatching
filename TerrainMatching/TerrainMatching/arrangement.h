@@ -31,9 +31,10 @@ public:
     double x,y; // coordinates
 	std::multiset<Event, std::greater<Event>>::iterator it_eventQueue;
 	bool insideWindow;
+	bool handled; // handled by previous events
 
-	ArrangementVertexData() { x = 0; y = 0; it_eventQueue._Ptr = NULL; }
-	ArrangementVertexData(Terrain::VertexData &tvd) { x = tvd.p.x; y = tvd.p.y; }
+	ArrangementVertexData() { x = 0; y = 0; it_eventQueue._Ptr = NULL; handled = false; }
+	ArrangementVertexData(Terrain::VertexData &tvd) { x = tvd.p.x; y = tvd.p.y; it_eventQueue._Ptr = NULL; handled = false; }
 
 	inline bool operator< (const ArrangementVertexData &vd) const { // two points should not be "very close".
 		const double eps = 0.00000000001;
@@ -328,6 +329,41 @@ public:
 			erasedEdgeDataContainerIndices.insert(id);
 	}
 
+	// properly delete all related datastructure of ed (including vertex to be isolated).
+	void deleteEdge(EdgeData *ed)
+	{
+		// vertex handling (up->origin)
+		if (ed->halfEdge_up->getOrigin()->getIncidentEdge() == ed->halfEdge_up) {
+			HalfEdge *he_upnext = ed->halfEdge_up->getTwin()->getNext();
+			if (ed->halfEdge_up == he_upnext) // no edge for halfEdge_up->origin,
+				deleteVertex(ed->halfEdge_up->getOrigin() - &vertices[0]); // origin will be isolated.
+			else {
+				ed->halfEdge_up->getOrigin()->setIncidentEdge(he_upnext); // set another incidentEdge for origin.
+				ed->halfEdge_up->getPrev()->setNext(ed->halfEdge_down->getNext()); // connect prev and next.
+			}
+		}
+		else {
+			ed->halfEdge_up->getPrev()->setNext(ed->halfEdge_down->getNext()); // connect prev and next.
+		}
+		// vertex handling (down->origin)
+		if (ed->halfEdge_down->getOrigin()->getIncidentEdge() == ed->halfEdge_down) {
+			HalfEdge *he_downnext = ed->halfEdge_down->getTwin()->getNext();
+			if (ed->halfEdge_down == he_downnext) // no edge for halfEdge_up->origin,
+				deleteVertex(ed->halfEdge_down->getOrigin() - &vertices[0]); // origin will be isolated.
+			else {
+				ed->halfEdge_down->getOrigin()->setIncidentEdge(he_downnext); // set another incidentEdge for origin.
+				ed->halfEdge_down->getPrev()->setNext(ed->halfEdge_up->getNext()); // connect prev and next.
+			}
+		}
+		else {
+			ed->halfEdge_down->getPrev()->setNext(ed->halfEdge_up->getNext()); // connect prev and next.
+		}
+		// delete from datastructure.(lazy)
+		deleteHalfEdge(ed->halfEdge_up - &halfEdges[0]);
+		deleteHalfEdge(ed->halfEdge_down - &halfEdges[0]);
+		deleteEdgeData(ed - &edgeDataContainer[0]);
+	}
+
 private:
 	HalfEdge *firstHalfEdge;
 	HalfEdge *firstHalfEdge_next; // This information is used to remember an initial CS for the next cell.
@@ -345,9 +381,7 @@ public:
 	ArrangementVertex *v;
 
 	Event() {}
-	Event(ArrangementVertex *_v) {
-		v = _v;
-	}
+	Event(ArrangementVertex *_v) : v(_v) {}
 
 	bool operator<(const Event &ep) const {
 		return v->getData() < ep.v->getData();

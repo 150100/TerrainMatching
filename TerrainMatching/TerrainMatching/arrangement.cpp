@@ -78,18 +78,41 @@ public:
 	double getValue(Vector2<T> &v) {
 		return a*v.x + b*v.y + c;
 	}
+	double getXonLine(T y) {
+		return (-b*y - c) / a;
+	}
+	double getYonLine(T x) {
+		return (-a*x - c) / b;
+	}
 };
 
 typedef ImplicitLine<double> ArrangementImplicitLine;
 
-bool arrVertexCompare(Arrangement::Vertex &v1, Arrangement::Vertex &v2)
-{
-	ArrangementVertexData &vd1 = v1.getData();
-	ArrangementVertexData &vd2 = v2.getData();
-	return (vd1.x < vd2.x) || (vd1.x == vd2.x && vd1.y < vd2.y);
-}
-
 ///
+
+bool Arrangement::intersectWindowBoundary(double x1, double y1, double x2, double y2) {
+	if (x1 != x2) { // normal situation
+		ImplicitLine<double> line(x1, y1, x2, y2);
+		// test intersection with lower-edge (x_min,y_min)->(x_max,y_min)
+		if (nearlyInClosedRange(line.getXonLine(y_min), x_min, x_max)) return true;
+		// test intersection with upper-edge (x_min,y_max)->(x_max,y_max)
+		else if (nearlyInClosedRange(line.getXonLine(y_max), x_min, x_max)) return true;
+		// test intersection with left-edge (x_min,y_min)->(x_min,y_max)
+		else if (nearlyInClosedRange(line.getYonLine(x_min), y_min, y_max)) return true;
+		// test intersection with left-edge (x_max,y_min)->(x_max,y_max)
+		else if (nearlyInClosedRange(line.getYonLine(x_max), y_min, y_max)) return true;
+		// not intersect to any boundary...
+		else return false;
+	}
+	else { // vertical line situation (x1 == x2)
+		auto y12_minmax = std::minmax(y1, y2);
+		return
+			nearlyInClosedRange(x1, x_min, x_max) && 
+			(nearlyInClosedRange(y1, y_min, y_max) || nearlyInClosedRange(y2, y_min, y_max) 
+			|| nearlyInClosedRange(y_min, y12_minmax.first, y12_minmax.second)
+			|| nearlyInClosedRange(y_max, y12_minmax.first, y12_minmax.second));
+	}
+}
 
 Arrangement::Arrangement(TerrainWithGrids *_t1, TerrainWithGrids *_t2)
 {
@@ -116,9 +139,9 @@ Arrangement::Arrangement(TerrainWithGrids *_t1, TerrainWithGrids *_t2)
 	// Initialize the first window
 	cur_x_grid = cur_y_grid = 0;
 	cur_x_min = x_min;
-	cur_x_max = x_min + x_gridStepSize;
+	cur_x_max = x_gridSize == 1 ? x_max : x_min + x_gridStepSize;
 	cur_y_min = y_min;
-	cur_y_max = y_min + y_gridStepSize;
+	cur_y_max = y_gridSize == 1 ? y_max : y_min + y_gridStepSize;
 
 	// initialize space
 	const double asymptotic_space = t1->number_of_vertices() + t2->number_of_vertices() * t2->number_of_vertices();
@@ -180,9 +203,9 @@ void Arrangement::insertTranslatedCopies()
 {
 	// get grid range
 	cur_x_min = cur_x_grid * x_gridStepSize + x_min;
-	cur_x_max = (cur_x_grid + 1) * x_gridStepSize + x_min;
+	cur_x_max = cur_x_grid == x_gridSize - 1 ? x_max : (cur_x_grid + 1) * x_gridStepSize + x_min;
 	cur_y_min = cur_y_grid * y_gridStepSize + y_min;
-	cur_y_max = (cur_y_grid + 1) * y_gridStepSize + y_min;
+	cur_y_max = cur_y_grid == y_gridSize - 1 ? y_max : (cur_y_grid + 1) * y_gridStepSize + y_min;
 	ArrangementVector cur_dL(cur_x_min, cur_y_min);
 	ArrangementVector cur_uL(cur_x_min, cur_y_max);
 	ArrangementVector cur_dR(cur_x_max, cur_y_min);
@@ -236,47 +259,49 @@ void Arrangement::insertTranslatedCopies()
 				while (eit.hasNext()) {
 					// insert the halfedge.
 					TerrainHalfEdge *he_t1 = eit.getNext();
-					if (he_t1->getData().arrIndex == -1) {
+#ifdef DEBUG
+					if (he_t1->getData().arrIndex != -1)
+						throw cpp::Exception("double insertion of halfedge. (Arrangement::insertTranslatedCopies() 1)");
+#endif
+					createHalfEdge(); // allocate space for the halfedge
+					if (first) {
+						v_arr->setIncidentEdge(&halfEdges.at(halfEdgesIdx));
+						first = false;
+					}
+					he_t1->getData().arrIndex = halfEdgesIdx++; // mark halfEdge index
+					halfEdgeScope_t1.push_back(he_t1); // collect halfedges in the window scope
+				}
+			}
+
+			// if the vertex is not in window, find halfedges of the vertex that are in the window. mark only the intersecting halfedge and origin vertex.
+			else {
+				bool first = true;
+				Terrain::EdgeIterator eit(v_t1);
+				while (eit.hasNext()) {
+					// insert the halfedge.
+					TerrainHalfEdge *he_t1 = eit.getNext();
+#ifdef DEBUG
+					if (he_t1->getData().arrIndex != -1)
+						throw cpp::Exception("double insertion of halfedge. (Arrangement::insertTranslatedCopies() 2)");
+#endif
+					double v_arr_twin_x = he_t1->getTwin()->getOrigin()->getData().p.x - v_t2->getData().p.x;
+					double v_arr_twin_y = he_t1->getTwin()->getOrigin()->getData().p.y - v_t2->getData().p.y;
+					if (intersectWindowBoundary(v_arr_x, v_arr_y, v_arr_twin_x, v_arr_twin_y)) {
 						createHalfEdge(); // allocate space for the halfedge
 						if (first) {
+							Vertex *v_arr = createVertex();
+							v_t1->getData().arrIndex = verticesIdx++; // mark vertex index
+							vertexOutsideWindow_t1.push_back(v_t1); // push to outside vertex
+							v_arr->getData().x = v_arr_x;
+							v_arr->getData().y = v_arr_y;
+							v_arr->getData().insideWindow = false;
 							v_arr->setIncidentEdge(&halfEdges.at(halfEdgesIdx));
 							first = false;
 						}
 						he_t1->getData().arrIndex = halfEdgesIdx++; // mark halfEdge index
 						halfEdgeScope_t1.push_back(he_t1); // collect halfedges in the window scope
 					}
-					else if (first) {
-						v_arr->setIncidentEdge(&halfEdges.at(he_t1->getData().arrIndex));
-						first = false;
-					}
-					// insert the twin halfedge.
-					TerrainHalfEdge *he_twin_t1 = he_t1->getTwin();
-					if (he_twin_t1->getData().arrIndex == -1) {
-						HalfEdge *he_twin = createHalfEdge(); // allocate space for the halfedge
-						he_twin_t1->getData().arrIndex = halfEdgesIdx++; // mark halfEdge index
-						halfEdgeScope_t1.push_back(he_twin_t1); // collect halfedges in the window scope
-
-						// insert a vertex just outside of the window.
-						TerrainVertex *v_twin_t1 = he_twin_t1->getOrigin();
-						if (v_twin_t1->getData().arrIndex == -1) {
-							double v_twin_x = v_twin_t1->getData().p.x - v_t2->getData().p.x;
-							double v_twin_y = v_twin_t1->getData().p.y - v_t2->getData().p.y;
-							if (!isInWindow(v_twin_x, v_twin_y)) {
-								Vertex *v_twin = createVertex();
-								v_twin_t1->getData().arrIndex = verticesIdx++; // mark vertex index
-								v_twin->getData().x = v_twin_x;
-								v_twin->getData().y = v_twin_y;
-								v_twin->getData().insideWindow = false;
-								v_twin->setIncidentEdge(he_twin);
-								vertexOutsideWindow_t1.push_back(v_twin_t1);
-							}
-						}
-					}
 				}
-			}
-			// create vertex info if a halfedge of the vertex is in the window. mark only the intersecting halfedge.
-			else {
-
 			}
 		}
 
@@ -404,41 +429,48 @@ void Arrangement::insertTranslatedCopies()
 				Terrain::EdgeIterator eit(v_t2);
 				while (eit.hasNext()) {
 					TerrainHalfEdge *he_t2 = eit.getNext();
-					if (he_t2->getData().arrIndex == -1) {
+#ifdef DEBUG
+					if (he_t2->getData().arrIndex != -1)
+						throw cpp::Exception("double insertion of halfedge. (Arrangement::insertTranslatedCopies() 3)");
+#endif
+					createHalfEdge(); // allocate space for the halfedge
+
+					if (first) {
+						v_arr->setIncidentEdge(&halfEdges.at(halfEdgesIdx));
+						first = false;
+					}
+					he_t2->getData().arrIndex = halfEdgesIdx++; // mark halfEdge index
+					halfEdgeScope_t2.push_back(he_t2); // collect halfedges in the window scope
+				}
+			}
+
+			// if the vertex is not in window, find halfedges of the vertex that are in the window. mark only the intersecting halfedge and origin vertex.
+			else {
+				bool first = true;
+				Terrain::EdgeIterator eit(v_t2);
+				while (eit.hasNext()) {
+					// insert the halfedge.
+					TerrainHalfEdge *he_t2 = eit.getNext();
+#ifdef DEBUG
+					if (he_t2->getData().arrIndex != -1)
+						throw cpp::Exception("double insertion of halfedge. (Arrangement::insertTranslatedCopies() 2)");
+#endif
+					double v_arr_twin_x = v_t1->getData().p.x - he_t2->getTwin()->getOrigin()->getData().p.x;
+					double v_arr_twin_y = v_t1->getData().p.y - he_t2->getTwin()->getOrigin()->getData().p.y;
+					if (intersectWindowBoundary(v_arr_x, v_arr_y, v_arr_twin_x, v_arr_twin_y)) {
 						createHalfEdge(); // allocate space for the halfedge
 						if (first) {
+							Vertex *v_arr = createVertex();
+							v_t2->getData().arrIndex = verticesIdx++; // mark vertex index
+							vertexOutsideWindow_t2.push_back(v_t2); // push to outside vertex
+							v_arr->getData().x = v_arr_x;
+							v_arr->getData().y = v_arr_y;
+							v_arr->getData().insideWindow = false;
 							v_arr->setIncidentEdge(&halfEdges.at(halfEdgesIdx));
 							first = false;
 						}
 						he_t2->getData().arrIndex = halfEdgesIdx++; // mark halfEdge index
 						halfEdgeScope_t2.push_back(he_t2); // collect halfedges in the window scope
-					}
-					else if (first) {
-						v_arr->setIncidentEdge(&halfEdges.at(he_t2->getData().arrIndex));
-						first = false;
-					}
-					// insert the twin halfedge.
-					TerrainHalfEdge *he_twin_t2 = he_t2->getTwin();
-					if (he_twin_t2->getData().arrIndex == -1) {
-						HalfEdge *he_twin = createHalfEdge(); // allocate space for the halfedge
-						he_twin_t2->getData().arrIndex = halfEdgesIdx++; // mark halfEdge index
-						halfEdgeScope_t2.push_back(he_twin_t2); // collect halfedges in the window scope
-
-						// insert a vertex just outside of the window.
-						TerrainVertex *v_twin_t2 = he_twin_t2->getOrigin();
-						if (v_twin_t2->getData().arrIndex == -1) {
-							double v_twin_x = v_t1->getData().p.x - v_twin_t2->getData().p.x;
-							double v_twin_y = v_t1->getData().p.y - v_twin_t2->getData().p.y;
-							if (!isInWindow(v_twin_x, v_twin_y)) {
-								Vertex *v_twin = createVertex();
-								v_twin_t2->getData().arrIndex = verticesIdx++; // mark vertex index
-								v_twin->getData().x = v_twin_x;
-								v_twin->getData().y = v_twin_y;
-								v_twin->getData().insideWindow = false;
-								v_twin->setIncidentEdge(he_twin);
-								vertexOutsideWindow_t2.push_back(v_twin_t2);
-							}
-						}
 					}
 				}
 			}
@@ -1316,6 +1348,8 @@ void SweepLine::updateDCEL2VertexIntersection(ArrangementVertex *v, ArrangementV
 						else
 							throw cpp::Exception("Length should be shorter, longer, or the same.");
 					}
+					else
+						throw cpp::Exception("Two edges should be the same direction or the opposite direction.");
 				}
 				else {
 					// link he to v between he_prev and he_next
@@ -1336,16 +1370,16 @@ void SweepLine::updateDCEL2VertexIntersection(ArrangementVertex *v, ArrangementV
 	events_erase(v_del);
 
 #ifdef DEBUG
-	//std::cerr << "--- TwoVertexIntersection Result ---\n";
-	//std::cerr << "vertex : " << v << " (" << v->getData().x << ',' << v->getData().y << ")\n";
-	//Arrangement::EdgeIterator eit_debug(v);
-	//while (eit_debug.hasNext()) {
-	//	ArrangementHalfEdge *he = eit_debug.getNext();
-	//	std::cerr << he->getData().edgeData << '(' << he << ',' << he->getTwin() << ')' << " - ";
-	//	he->getData().edgeData->print(std::cerr);
-	//	std::cerr << '\n';
-	//}
-	//std::cerr << '\n';
+	std::cerr << "--- TwoVertexIntersection Result ---\n";
+	std::cerr << "vertex : " << v << " (" << v->getData().x << ',' << v->getData().y << ")\n";
+	Arrangement::EdgeIterator eit_debug(v);
+	while (eit_debug.hasNext()) {
+		ArrangementHalfEdge *he = eit_debug.getNext();
+		std::cerr << he->getData().edgeData << '(' << he << ',' << he->getTwin() << ')' << " - ";
+		he->getData().edgeData->print(std::cerr);
+		std::cerr << '\n';
+	}
+	std::cerr << '\n';
 
 	for (unsigned int i = 0; i < parent->halfEdges.size(); ++i) {
 		if (parent->erasedHalfEdgesIndices.find(i) != parent->erasedHalfEdgesIndices.end())

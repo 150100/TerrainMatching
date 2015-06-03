@@ -189,6 +189,8 @@ public:
 		return nearlyInClosedRange(x, cur_x_min, cur_x_max)
 			&& nearlyInClosedRange(y, cur_y_min, cur_y_max);
 	}
+	// An edge intersect the window boundary?
+	inline bool intersectWindowBoundary(double x1, double y1, double x2, double y2);
 
 	// Is he is the firstHalfEdge of the next grid?
 	inline bool isNextFirstHalfEdge(HalfEdge *he) {

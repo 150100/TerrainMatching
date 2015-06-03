@@ -31,15 +31,18 @@ public:
     double x,y; // coordinates
 	std::multiset<Event, std::greater<Event>>::iterator it_eventQueue;
 	bool insideWindow;
-	bool handled; // handled by previous events
+	bool inEvent;
 
-	ArrangementVertexData() { x = 0; y = 0; it_eventQueue._Ptr = NULL; handled = false; }
-	ArrangementVertexData(Terrain::VertexData &tvd) { x = tvd.p.x; y = tvd.p.y; it_eventQueue._Ptr = NULL; handled = false; }
+	ArrangementVertexData() { x = 0; y = 0; insideWindow = false; inEvent = false; }
+	ArrangementVertexData(Terrain::VertexData &tvd) { x = tvd.p.x; y = tvd.p.y; insideWindow = false; inEvent = false; }
 
-	inline bool operator< (const ArrangementVertexData &vd) const { // two points should not be "very close".
-		const double eps = 0.00000000001;
-		return x < vd.x - eps || (x < vd.x + eps && y < vd.y - eps); // lexicographical ordering considering floating-point error.
+	inline bool operator< (const ArrangementVertexData &vd) const {
+		return x < vd.x  || (x == vd.x && y < vd.y); // lexicographical ordering
 	}
+	//inline bool operator< (const ArrangementVertexData &vd) const { // two points should not be "very close".
+	//	const double eps = 0.00000000001;
+	//	return x < vd.x - eps || (x < vd.x + eps && y < vd.y - eps); // lexicographical ordering considering floating-point error.
+	//}
 	inline bool operator== (const ArrangementVertexData &vd) const {
 		return nearlyEqual(x, vd.x) && nearlyEqual(y, vd.y);
 	}
@@ -101,8 +104,9 @@ public:
 	HalfEdgeT<ArrangementVertexData, ArrangementHalfEdgeData, ArrangementFaceData> 
 		*halfEdge_up, *halfEdge_down;
 	std::multiset<ArrangementEdgeData *, ArrangementEdgeDataCompare>::iterator it_edgeDataBBT;
+	bool inEdgeDataBBT;
 
-	ArrangementEdgeData() { halfEdge_up = NULL; halfEdge_down = NULL; it_edgeDataBBT._Ptr = NULL; }
+	ArrangementEdgeData() { halfEdge_up = NULL; halfEdge_down = NULL; inEdgeDataBBT = false; }
 
 	inline void print(std::ostream &os) {
 		halfEdge_up->getOrigin()->getData().print(os);
@@ -330,13 +334,17 @@ public:
 	}
 
 	// properly delete all related datastructure of ed (including vertex to be isolated).
-	void deleteEdge(EdgeData *ed)
+	// return whether the vertices(halfEdge_up->origin, halfEdge_down->origin) are deleted.
+	std::pair<bool, bool> deleteEdge(EdgeData *ed)
 	{
 		// vertex handling (up->origin)
+		bool up_origin_deleted = false;
 		if (ed->halfEdge_up->getOrigin()->getIncidentEdge() == ed->halfEdge_up) {
 			HalfEdge *he_upnext = ed->halfEdge_up->getTwin()->getNext();
-			if (ed->halfEdge_up == he_upnext) // no edge for halfEdge_up->origin,
-				deleteVertex(ed->halfEdge_up->getOrigin() - &vertices[0]); // origin will be isolated.
+			if (ed->halfEdge_up == he_upnext) { // no edge for halfEdge_up->origin,
+				deleteVertex(ed->halfEdge_up->getOrigin() - &vertices[0]); // origin will be isolated. delete.
+				up_origin_deleted = true;
+			}
 			else {
 				ed->halfEdge_up->getOrigin()->setIncidentEdge(he_upnext); // set another incidentEdge for origin.
 				ed->halfEdge_up->getPrev()->setNext(ed->halfEdge_down->getNext()); // connect prev and next.
@@ -346,10 +354,13 @@ public:
 			ed->halfEdge_up->getPrev()->setNext(ed->halfEdge_down->getNext()); // connect prev and next.
 		}
 		// vertex handling (down->origin)
+		bool down_origin_deleted = false;
 		if (ed->halfEdge_down->getOrigin()->getIncidentEdge() == ed->halfEdge_down) {
 			HalfEdge *he_downnext = ed->halfEdge_down->getTwin()->getNext();
-			if (ed->halfEdge_down == he_downnext) // no edge for halfEdge_up->origin,
+			if (ed->halfEdge_down == he_downnext) { // no edge for halfEdge_up->origin,
 				deleteVertex(ed->halfEdge_down->getOrigin() - &vertices[0]); // origin will be isolated.
+				down_origin_deleted = true;
+			}
 			else {
 				ed->halfEdge_down->getOrigin()->setIncidentEdge(he_downnext); // set another incidentEdge for origin.
 				ed->halfEdge_down->getPrev()->setNext(ed->halfEdge_up->getNext()); // connect prev and next.
@@ -362,6 +373,8 @@ public:
 		deleteHalfEdge(ed->halfEdge_up - &halfEdges[0]);
 		deleteHalfEdge(ed->halfEdge_down - &halfEdges[0]);
 		deleteEdgeData(ed - &edgeDataContainer[0]);
+
+		return std::pair<bool, bool>(up_origin_deleted, down_origin_deleted);
 	}
 
 private:
@@ -414,41 +427,46 @@ private:
 	static double x_stepSize, y_stepSize;
 
 	static EventQueueIterator events_insert(ArrangementVertex *v) {
-		//std::cerr << "event insert : " << v << '\n';
-		EventQueueIterator it = events.emplace(v);
+		EventQueueIterator it;
+		if (v->getData().inEvent) {
+			events_erase(v);
+			it = v->getData().it_eventQueue;
+		}
+		it = events.emplace(v);
 		v->getData().it_eventQueue = it;
+		v->getData().inEvent = true;
 		return it;
 	}
 	static EventQueueIterator events_erase(ArrangementVertex *v) {
-		//std::cerr << "event erase : " << v << '\n';
 		EventQueueIterator it;
-		if (v->getData().it_eventQueue._Ptr != NULL) {
+		if (v->getData().inEvent) {
 			it = events.erase(v->getData().it_eventQueue);
-			v->getData().it_eventQueue._Ptr = NULL;
+			v->getData().inEvent = false;
 		}
 		return it;
 	}
 	static Event events_popfront() {
 		Event e = *events.begin();
-		//std::cerr << "event popfront : " << e.v << '\n';
 		events.erase(events.begin());
-		e.v->getData().it_eventQueue._Ptr = NULL;
+		e.v->getData().inEvent = false;
 		return e;
 	}
 
 	static EdgeDataBBTIterator edgeDataBBT_insert(ArrangementEdgeData *ed) {
 		EdgeDataBBTIterator it = edgeDataBBT.insert(ed);
 		ed->it_edgeDataBBT = it;
+		ed->inEdgeDataBBT = true;
 		return it;
 	}
 	static EdgeDataBBTIterator edgeDataBBT_insert(EdgeDataBBTIterator hintit, ArrangementEdgeData *ed) {
 		EdgeDataBBTIterator it = edgeDataBBT.insert(hintit, ed);
 		ed->it_edgeDataBBT = it;
+		ed->inEdgeDataBBT = true;
 		return it;
 	}
 	static EdgeDataBBTIterator edgeDataBBT_erase(ArrangementEdgeData *ed) {
 		EdgeDataBBTIterator ret = edgeDataBBT.erase(ed->it_edgeDataBBT);
-		ed->it_edgeDataBBT._Ptr = NULL;
+		ed->inEdgeDataBBT = false;
 		return ret;
 	}
 
@@ -457,8 +475,6 @@ private:
 	static ArrangementVertex* updateDCELProperIntersection(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2, double int_x, double int_y);
 	static ArrangementEdgeData* updateDCELVertexEdgeIntersection(ArrangementVertex *v, ArrangementEdgeData *ed, bool survive_v);
 	static void updateDCEL2VertexIntersection(ArrangementVertex *v, ArrangementVertex *v_erase);
-	static void updateDCELTwinEdgeWithOneSharedVertex(ArrangementHalfEdge *he_prev, ArrangementHalfEdge *he_next);
-	static void updateDCELTwinEdgeWithTwoSharedVertex(ArrangementHalfEdge *he_prev, ArrangementHalfEdge *he_next);
 
 public:
 	SweepLine() {}

@@ -141,7 +141,6 @@ int main(int argc, char **argv)
 
 	try {
 		do {
-			std::cerr << "\n<< Next Grid >>\n\n";
 			do {
 				//std::cin >> ch;
 #ifdef DEBUG

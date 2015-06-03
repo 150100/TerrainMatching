@@ -36,13 +36,10 @@ public:
 	ArrangementVertexData() { x = 0; y = 0; insideWindow = false; inEvent = false; }
 	ArrangementVertexData(Terrain::VertexData &tvd) { x = tvd.p.x; y = tvd.p.y; insideWindow = false; inEvent = false; }
 
-	inline bool operator< (const ArrangementVertexData &vd) const {
-		return x < vd.x  || (x == vd.x && y < vd.y); // lexicographical ordering
+	inline bool operator< (const ArrangementVertexData &vd) const { // two points should not be "very close".
+		const double eps = 0.00000000001;
+		return x < vd.x - eps || (x < vd.x + eps && y < vd.y - eps); // lexicographical ordering considering floating-point error.
 	}
-	//inline bool operator< (const ArrangementVertexData &vd) const { // two points should not be "very close".
-	//	const double eps = 0.00000000001;
-	//	return x < vd.x - eps || (x < vd.x + eps && y < vd.y - eps); // lexicographical ordering considering floating-point error.
-	//}
 	inline bool operator== (const ArrangementVertexData &vd) const {
 		return nearlyEqual(x, vd.x) && nearlyEqual(y, vd.y);
 	}
@@ -159,7 +156,7 @@ public:
 
 	// Total arrangement information
 	double x_min, x_max, y_min, y_max;
-	unsigned x_gridSize, y_gridSize;
+	int x_gridSize, y_gridSize;
 	double x_gridStepSize, y_gridStepSize;
 
 	// Window information

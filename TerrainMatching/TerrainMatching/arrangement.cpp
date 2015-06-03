@@ -102,15 +102,16 @@ Arrangement::Arrangement(TerrainWithGrids *_t1, TerrainWithGrids *_t2)
 	t2 = _t2;
 
 	// Compute total arrangement information
-	x_min = t1->x_min - t2->x_max;
-	x_max = t1->x_max - t2->x_min;
-	y_min = t1->y_min - t2->y_max;
-	y_max = t1->y_max - t2->y_min;
+	x_min = t1->x_min - t2->x_min;
+	x_max = t1->x_max - t2->x_max;
+	y_min = t1->y_min - t2->y_min;
+	y_max = t1->y_max - t2->y_max;
 	const double edgeLength_max = std::max(t1->edgeLength_max, t2->edgeLength_max);
 	const double windowSideLength = WINDOW_EDGEMAX_RATIO * edgeLength_max;
 	x_gridStepSize = y_gridStepSize = windowSideLength;
 	x_gridSize = std::ceil((x_max - x_min) / x_gridStepSize);
 	y_gridSize = std::ceil((y_max - y_min) / y_gridStepSize);
+	if (x_gridSize <= 0 || y_gridSize <= 0) throw cpp::Exception("bounding box of t2 cannot be contained by that of t1.");
 
 	// Initialize the first window
 	cur_x_grid = cur_y_grid = 0;
@@ -221,7 +222,7 @@ void Arrangement::insertTranslatedCopies()
 			double v_arr_x = v_t1->getData().p.x - v_t2->getData().p.x;
 			double v_arr_y = v_t1->getData().p.y - v_t2->getData().p.y;
 
-			// create vertex info only if the vertex is in the window.
+			// create vertex info if the vertex is in the window.
 			if (isInWindow(v_arr_x, v_arr_y)) {
 				Vertex *v_arr = createVertex();
 				v_t1->getData().arrIndex = verticesIdx++; // mark vertex index
@@ -272,6 +273,10 @@ void Arrangement::insertTranslatedCopies()
 						}
 					}
 				}
+			}
+			// create vertex info if a halfedge of the vertex is in the window. mark only the intersecting halfedge.
+			else {
+
 			}
 		}
 
@@ -1448,7 +1453,8 @@ void SweepLine::advance()
 				vec_edge_before_event = vec_edge;
 			}
 		}
-		else if (ep.v->getData() < vd) { // if he is the first after-event edge, set it to the first edge of after-edges.
+		else if (ep.v->getData() < vd) 
+		{ // if he is the first after-event edge, set it to the first edge of after-edges.
 			if (AEedge == NULL || vec_edge.isLeftFrom(vec_edge_after_event)) {
 				AEedge = he;
 				vec_edge_after_event = vec_edge;
@@ -1460,17 +1466,17 @@ void SweepLine::advance()
 	}
 
 	// Erase mode. ¢Ä
+	unsigned int numErased = 0;
 	EdgeDataBBTIterator bbt_entry; // remember the position that edges erased.
 	bbt_entry._Ptr = NULL;
 	if (BEedge != NULL) {
-
 		ep.v->setIncidentEdge(BEedge);
 		Arrangement::EdgeIterator BEeit(ep.v);
 		ArrangementHalfEdge *he = BEeit.getNext();
 		bbt_entry = he->getData().edgeData->it_edgeDataBBT;
-		//bbt_entry = edgeDataBBT.upper_bound(BEedge->getData().edgeData);
 		do { // erase all the existing edges containing ep.v.
 			bbt_entry = edgeDataBBT_erase(he->getData().edgeData);
+			++numErased;
 			he = BEeit.getNext();
 		} while (he != AEedge && he != BEedge);
 
@@ -1495,15 +1501,11 @@ void SweepLine::advance()
 #endif
 
 	// Insert mode. ¢Å
+	unsigned int numInserted = 0;
 	if (AEedge != NULL) {
-
 		ep.v->setIncidentEdge(AEedge);
 		Arrangement::EdgeIterator AEeit(ep.v);
 		ArrangementHalfEdge *he = AEeit.getNext();
-		//EdgeDataBBTIterator eit_same_y = edgeDataBBT.find(he->getData().edgeData);
-		//if (eit_same_y != edgeDataBBT.end()) { // if there is already an edge passing ep.v (so cannot be inserted), error.
-		//	throw cpp::Exception("An edge passing ep.v should be handled before.");
-		//}
 		EdgeDataBBTIterator inserted_lowerbound, inserted_upperbound;
 		bool after_first = false;
 		EdgeDataBBTIterator hintit;
@@ -1514,13 +1516,13 @@ void SweepLine::advance()
 		do { // insert only when he does not reach to BEedge or AEedge yet.
 			EdgeDataBBTIterator hintit_prev = hintit;
 			EdgeDataBBTIterator inserted_it = edgeDataBBT_insert(hintit, he->getData().edgeData);
+			++numInserted;
 			// update lowerbound and upperbound.
 			if (!after_first) {
 				after_first = true;
 				inserted_lowerbound = inserted_it;
 			}
 			inserted_upperbound = inserted_it;
-
 			hintit = ++inserted_it; // update hint.
 			he = AEeit.getNext(); // next step.
 		} while (he != BEedge && he != AEedge);
@@ -1549,7 +1551,8 @@ void SweepLine::advance()
 		std::cerr << '\n';
 		++it_debug;
 	}
+	std::cerr << "\nNum inserted = " << numInserted;
+	std::cerr << "\nNum erased = " << numErased;
 	std::cerr << '\n';
 #endif
 }
-

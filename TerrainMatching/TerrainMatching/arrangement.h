@@ -32,9 +32,10 @@ public:
 	std::multiset<Event, std::greater<Event>>::iterator it_eventQueue;
 	bool insideWindow;
 	bool inEvent;
+	bool confirmed; // confirmed in sweepline algorithm
 
-	ArrangementVertexData() { x = 0; y = 0; insideWindow = false; inEvent = false; }
-	ArrangementVertexData(Terrain::VertexData &tvd) { x = tvd.p.x; y = tvd.p.y; insideWindow = false; inEvent = false; }
+	ArrangementVertexData() { x = 0; y = 0; insideWindow = false; inEvent = false; confirmed = false; }
+	ArrangementVertexData(Terrain::VertexData &tvd) { x = tvd.p.x; y = tvd.p.y; insideWindow = false; inEvent = false; confirmed = false; }
 
 	inline bool operator< (const ArrangementVertexData &vd) const { // two points should not be "very close".
 		const double eps = 0.00000000001;

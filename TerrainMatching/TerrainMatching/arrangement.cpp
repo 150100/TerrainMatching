@@ -1038,10 +1038,7 @@ Arrangement::Vertex* SweepLine::updateDCELMultipleVertexIntersection(std::vector
 #endif
 
 	// all halfedges related to vList will be collected to incident edges of v_new.
-	ArrangementVertex *v_new = parent->createVertex();
-	v_new->getData().x = vList[0]->getData().x;
-	v_new->getData().y = vList[0]->getData().y;
-	v_new->getData().insideWindow = vList[0]->getData().insideWindow;
+	ArrangementVertex *v_new = NULL;
 
 	// map vector of halfedge to halfedge. this will be sorted in clockwise direction (from 0-degree = (0,1)).
 	bool(*fn_pt)(const ArrangementVector &, const ArrangementVector &) = compareVectorClockwise;
@@ -1053,23 +1050,38 @@ Arrangement::Vertex* SweepLine::updateDCELMultipleVertexIntersection(std::vector
 		while (eit.hasNext()) {
 			ArrangementHalfEdge *he = eit.getNext();
 			vectorMap.insert(std::pair<ArrangementVector, ArrangementHalfEdge *>(he, he));
+			if (he->getOrigin()->getData().confirmed)
+				v_new = he->getOrigin();
 		}
 	}
+#ifdef DEBUG
+	if (v_new == NULL)
+		throw cpp::Exception("no confirmed vertex.");
+#endif 
 
 	// connect halfedges to v_new and connect between halfedges.
 	// attatch first one.
 	auto he_mapit = vectorMap.begin();
 	ArrangementHalfEdge *he = he_mapit->second;
 	ArrangementHalfEdge *he_first = he;
-	// detatch he from its structure.
-	parent->detatchEdge(he->getData().edgeData);
-	events_insert(he->getTwin()->getOrigin());
+	if (he->getOrigin() != v_new) {
+#ifdef DEBUG
+		if (he->getOrigin()->getData().confirmed)
+			throw cpp::Exception("confirmed");
+#endif
+		// detatch he from its structure.
+		parent->detatchEdge(he->getData().edgeData);
+		events_insert(he->getTwin()->getOrigin());
+	}
 	// handled event should be erased.
 	events_erase(he->getOrigin());
+	// new event should be inserted.
+	events_insert(v_new);
 	// link he to v.
 	he->getTwin()->setNext(he);
 	he->setOrigin(v_new);
 	v_new->setIncidentEdge(he);
+	he->getTwin()->getOrigin()->getData().confirmed = true;
 	// proceed iterator.
 	++he_mapit;
 
@@ -1092,12 +1104,18 @@ Arrangement::Vertex* SweepLine::updateDCELMultipleVertexIntersection(std::vector
 				else if ((vec_prev > vec_zero && vec > vec_prev) || (vec_zero > vec_prev && vec_prev > vec)) { // he_prev is shorter than he
 					ArrangementEdgeData *ed_he = he->getData().edgeData;
 					ArrangementEdgeData *ed = he_prev->getData().edgeData;
-					// detatch ed_he.
-					auto res = parent->detatchEdge(ed_he);
-					if (!res.first)
-						events_insert(he->getOrigin());
-					if (!res.second)
-						events_insert(he->getTwin()->getOrigin());
+					if (he->getOrigin() != v_new) {
+#ifdef DEBUG
+						if (he->getOrigin()->getData().confirmed)
+							throw cpp::Exception("confirmed");
+#endif
+						// detatch ed_he.
+						auto res = parent->detatchEdge(ed_he);
+						if (!res.first)
+							events_insert(he->getOrigin());
+						if (!res.second)
+							events_insert(he->getTwin()->getOrigin());
+					}
 					// shrink location of the he->origin to he_prev->twin->origin.
 					ArrangementVertex *he_origin = he->getOrigin();
 					he_origin->getData().x = he_prev->getTwin()->getOrigin()->getData().x;
@@ -1156,8 +1174,6 @@ Arrangement::Vertex* SweepLine::updateDCELMultipleVertexIntersection(std::vector
 		}
 		++he_mapit;
 	}
-	// last link he_prev to he_first
-	//he_prev->getTwin()->setNext(he_first);
 	
 #ifdef DEBUG
 	std::cerr << "--- MultipleVertexIntersection Result ---\n";
@@ -1201,6 +1217,10 @@ void SweepLine::advance()
 	// while two event points have the same position, store them.
 	Event ep = events_popfront();
 	++eventCount;
+	if (firstEvent) {
+		ep.v->getData().confirmed = true;
+		firstEvent = false;
+	}
 #ifdef DEBUG
 	std::cerr << "================== Event " << eventCount << " ======================\n";
 	std::cerr << "ep = (" << ep.v->getData().x << ',' << ep.v->getData().y << ')' << "\n";
@@ -1217,10 +1237,9 @@ void SweepLine::advance()
 		vList.push_back(ep_next.v);
 	}
 	// merge stored vertices
-	if (multiple) {
-		events_insert(updateDCELMultipleVertexIntersection(vList));
-		ep = events_popfront();
-	}
+	events_insert(updateDCELMultipleVertexIntersection(vList));
+	ep = events_popfront();
+	ep.v->getData().confirmed = true;
 	currentEvent = &ep;
 
 #ifdef DEBUG
@@ -1342,15 +1361,13 @@ void SweepLine::advance()
 		// handle intersection with lower neighbor and higher neighbor
 		if (inserted_lowerbound != edgeDataBBT.begin()) { // if it is not the lowest, check intersection with the lower neighbor.
 			EdgeDataBBTIterator it_above = inserted_lowerbound;
-			if (ep.v == handleIntersectionEvent(*--it_above, *inserted_lowerbound)) { // if it_above passes ep.v,
-				throw cpp::Exception("Cannot be done. (it_above passes ep.v)");
-			}
+			ArrangementVertex *v_int = handleIntersectionEvent(*--it_above, *inserted_lowerbound);
+			v_int->getData().confirmed = true;
 		}
 		if (inserted_upperbound != --edgeDataBBT.end()) { // if it is not the highest, check intersection with the higher neighbor.
 			EdgeDataBBTIterator it_below = inserted_upperbound;
-			if (ep.v == handleIntersectionEvent(*inserted_upperbound, *++it_below)) { // if it_below passes ep.v,
-				throw cpp::Exception("Cannot be done. (it_below passes ep.v)");
-			}
+			ArrangementVertex *v_int = handleIntersectionEvent(*inserted_upperbound, *++it_below);
+			v_int->getData().confirmed = true;
 		}
 	}
 	

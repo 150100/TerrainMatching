@@ -1055,7 +1055,7 @@ Arrangement::Vertex* SweepLine::updateDCELMultipleVertexIntersection(std::vector
 			vectorMap.insert(std::pair<ArrangementVector, ArrangementHalfEdge *>(he, he));
 		}
 	}
-
+	11asa
 	// connect halfedges to v_new and connect between halfedges.
 	// attatch first one.
 	auto he_mapit = vectorMap.begin();

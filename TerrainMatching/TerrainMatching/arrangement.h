@@ -336,44 +336,57 @@ public:
 	// return whether the vertices(halfEdge_up->origin, halfEdge_down->origin) are deleted.
 	std::pair<bool, bool> deleteEdge(EdgeData *ed)
 	{
-		// vertex handling (up->origin)
-		bool up_origin_deleted = false;
-		if (ed->halfEdge_up->getOrigin()->getIncidentEdge() == ed->halfEdge_up) {
-			HalfEdge *he_upnext = ed->halfEdge_up->getTwin()->getNext();
-			if (ed->halfEdge_up == he_upnext) { // no edge for halfEdge_up->origin,
-				deleteVertex(ed->halfEdge_up->getOrigin() - &vertices[0]); // origin will be isolated. delete.
-				up_origin_deleted = true;
-			}
-			else {
-				ed->halfEdge_up->getOrigin()->setIncidentEdge(he_upnext); // set another incidentEdge for origin.
-				ed->halfEdge_up->getPrev()->setNext(ed->halfEdge_down->getNext()); // connect prev and next.
-			}
-		}
-		else {
-			ed->halfEdge_up->getPrev()->setNext(ed->halfEdge_down->getNext()); // connect prev and next.
-		}
-		// vertex handling (down->origin)
-		bool down_origin_deleted = false;
-		if (ed->halfEdge_down->getOrigin()->getIncidentEdge() == ed->halfEdge_down) {
-			HalfEdge *he_downnext = ed->halfEdge_down->getTwin()->getNext();
-			if (ed->halfEdge_down == he_downnext) { // no edge for halfEdge_up->origin,
-				deleteVertex(ed->halfEdge_down->getOrigin() - &vertices[0]); // origin will be isolated.
-				down_origin_deleted = true;
-			}
-			else {
-				ed->halfEdge_down->getOrigin()->setIncidentEdge(he_downnext); // set another incidentEdge for origin.
-				ed->halfEdge_down->getPrev()->setNext(ed->halfEdge_up->getNext()); // connect prev and next.
-			}
-		}
-		else {
-			ed->halfEdge_down->getPrev()->setNext(ed->halfEdge_up->getNext()); // connect prev and next.
-		}
+		auto res = detatchEdge(ed);
+		if (res.first) deleteVertex(ed->halfEdge_up->getOrigin() - &vertices[0]);
+		if (res.second) deleteVertex(ed->halfEdge_down->getOrigin() - &vertices[0]);
+
 		// delete from datastructure.(lazy)
 		deleteHalfEdge(ed->halfEdge_up - &halfEdges[0]);
 		deleteHalfEdge(ed->halfEdge_down - &halfEdges[0]);
 		deleteEdgeData(ed - &edgeDataContainer[0]);
 
-		return std::pair<bool, bool>(up_origin_deleted, down_origin_deleted);
+		return res;
+	}
+
+	std::pair<bool, bool> detatchEdge(EdgeData *ed)
+	{
+		// vertex handling (up->origin)
+		bool up_origin_only_edge = false;
+		HalfEdge *he_upnext = ed->halfEdge_up->getTwin()->getNext();
+		if (ed->halfEdge_up == he_upnext) { // no edge for halfEdge_up->origin,
+			up_origin_only_edge = true;
+		}
+		else {
+			ed->halfEdge_up->getOrigin()->setIncidentEdge(he_upnext); // set another incidentEdge for origin.
+			ed->halfEdge_up->getPrev()->setNext(ed->halfEdge_down->getNext()); // connect prev and next.
+			Vertex *v_upOrigin = createVertex();
+			v_upOrigin->getData().insideWindow = ed->halfEdge_up->getOrigin()->getData().insideWindow;
+			v_upOrigin->getData().x = ed->halfEdge_up->getOrigin()->getData().x;
+			v_upOrigin->getData().y = ed->halfEdge_up->getOrigin()->getData().y;
+			v_upOrigin->setIncidentEdge(ed->halfEdge_up);
+			ed->halfEdge_up->setOrigin(v_upOrigin);
+			ed->halfEdge_up->setPrev(ed->halfEdge_down); // seal prev.
+		}
+
+		// vertex handling (down->origin)
+		bool down_origin_only_edge = false;
+		HalfEdge *he_downnext = ed->halfEdge_down->getTwin()->getNext();
+		if (ed->halfEdge_down == he_downnext) { // no edge for halfEdge_up->origin,
+			down_origin_only_edge = true;
+		}
+		else {
+			ed->halfEdge_down->getOrigin()->setIncidentEdge(he_downnext); // set another incidentEdge for origin.
+			ed->halfEdge_down->getPrev()->setNext(ed->halfEdge_up->getNext()); // connect prev and next.
+			Vertex *v_downOrigin = createVertex();
+			v_downOrigin->getData().insideWindow = ed->halfEdge_down->getOrigin()->getData().insideWindow;
+			v_downOrigin->getData().x = ed->halfEdge_down->getOrigin()->getData().x;
+			v_downOrigin->getData().y = ed->halfEdge_down->getOrigin()->getData().y;
+			v_downOrigin->setIncidentEdge(ed->halfEdge_down);
+			ed->halfEdge_down->setOrigin(v_downOrigin);
+			ed->halfEdge_down->setPrev(ed->halfEdge_up); // seal prev.
+		}
+
+		return std::pair<bool, bool>(up_origin_only_edge, down_origin_only_edge);
 	}
 
 private:

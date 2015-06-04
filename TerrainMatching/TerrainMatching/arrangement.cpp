@@ -1061,6 +1061,9 @@ Arrangement::Vertex* SweepLine::updateDCELMultipleVertexIntersection(std::vector
 	auto he_mapit = vectorMap.begin();
 	ArrangementHalfEdge *he = he_mapit->second;
 	ArrangementHalfEdge *he_first = he;
+	// detatch he from its structure.
+	parent->detatchEdge(he->getData().edgeData);
+	events_insert(he->getTwin()->getOrigin());
 	// handled event should be erased.
 	events_erase(he->getOrigin());
 	// link he to v.
@@ -1087,31 +1090,30 @@ Arrangement::Vertex* SweepLine::updateDCELMultipleVertexIntersection(std::vector
 					throw cpp::Exception("Length sorting was not done well.");
 				}
 				else if ((vec_prev > vec_zero && vec > vec_prev) || (vec_zero > vec_prev && vec_prev > vec)) { // he_prev is shorter than he
-					// shrink he from its origin to v_shrink(=he_prev->twin->origin).
-					if (he->getTwin()->getNext() == he) { // if he was the only edge of its origin, completely remove that.
-						parent->deleteVertex(he->getOrigin() - &parent->vertices[0]);
-						events_erase(he->getOrigin());
-					}
-					ArrangementVertex *v_split = parent->createVertex();
-					he->setPrev(he->getTwin());
-					he->setOrigin(v_split);
-					v_split->getData().x = he_prev->getTwin()->getOrigin()->getData().x;
-					v_split->getData().y = he_prev->getTwin()->getOrigin()->getData().y;
-					v_split->getData().insideWindow = he_prev->getTwin()->getOrigin()->getData().insideWindow;
-					v_split->setIncidentEdge(he);
-					events_insert(v_split);
+					ArrangementEdgeData *ed_he = he->getData().edgeData;
+					ArrangementEdgeData *ed = he_prev->getData().edgeData;
+					// detatch ed_he.
+					auto res = parent->detatchEdge(ed_he);
+					if (!res.first)
+						events_insert(he->getOrigin());
+					if (!res.second)
+						events_insert(he->getTwin()->getOrigin());
+					// shrink location of the he->origin to he_prev->twin->origin.
+					ArrangementVertex *he_origin = he->getOrigin();
+					he_origin->getData().x = he_prev->getTwin()->getOrigin()->getData().x;
+					he_origin->getData().y = he_prev->getTwin()->getOrigin()->getData().y;
+					he_origin->getData().insideWindow = he_prev->getTwin()->getOrigin()->getData().insideWindow;
+					he_origin->setIncidentEdge(he);
 
 					// BBT handling
-					ArrangementEdgeData *ed_erase = he->getData().edgeData;
-					ArrangementEdgeData *ed = he_prev->getData().edgeData;
-					if (ed_erase->inEdgeDataBBT) {
+					if (ed_he->inEdgeDataBBT) {
 						if (ed->inEdgeDataBBT)
 							throw cpp::Exception("two twin-edges are in BBT.");
-						auto it = edgeDataBBT_erase(ed_erase);
+						auto it = edgeDataBBT_erase(ed_he);
 						edgeDataBBT_insert(it, ed);
 					}
 					// copy source data.
-					ed->sources.insert(ed->sources.end(), ed_erase->sources.begin(), ed_erase->sources.end());
+					ed->sources.insert(ed->sources.end(), ed_he->sources.begin(), ed_he->sources.end());
 				}
 				else if (vec_prev == vec) { // length of he_prev and he are the same
 					// remove the edge of he. (lazy) (handle events also)
@@ -1139,16 +1141,14 @@ Arrangement::Vertex* SweepLine::updateDCELMultipleVertexIntersection(std::vector
 			}
 		}
 		else {
-			// uplink he from its origin.
-			if (he->getTwin()->getNext() == he) // if the origin will be isolated, delete it.
-				parent->deleteVertex(he->getOrigin() - &parent->vertices[0]);
-			else
-				he->getOrigin()->setIncidentEdge(he->getTwin()->getNext());
+			// detatch he from the the formal structure.
+			parent->detatchEdge(he->getData().edgeData);
+			events_insert(he->getTwin()->getOrigin());
 			// handled event should be erased.
 			events_erase(he->getOrigin());
-			// link he to v_new after he_prev.
+			// link he to v_new after he_prev. 
 			he->getTwin()->setNext(he_prev->getTwin()->getNext());
-			he_prev->getTwin()->setNext(he);
+			he->setPrev(he_prev->getTwin());
 			he->setOrigin(v_new);
 			// set inserted edge as prev.
 			he_prev = he;
@@ -1198,17 +1198,13 @@ void SweepLine::initialize(Arrangement *_parent)
 
 void SweepLine::advance()
 {
-	// Take the first event
+	// while two event points have the same position, store them.
 	Event ep = events_popfront();
 	++eventCount;
-	currentEvent = &ep;
-
 #ifdef DEBUG
 	std::cerr << "================== Event " << eventCount << " ======================\n";
 	std::cerr << "ep = (" << ep.v->getData().x << ',' << ep.v->getData().y << ')' << "\n";
 #endif
-
-	// while two event points have the same position, store them.
 	std::vector<ArrangementVertex *> vList;
 	vList.push_back(ep.v);
 	bool multiple = false;
@@ -1221,8 +1217,11 @@ void SweepLine::advance()
 		vList.push_back(ep_next.v);
 	}
 	// merge stored vertices
-	if (multiple)
-		ep.v = updateDCELMultipleVertexIntersection(vList);
+	if (multiple) {
+		events_insert(updateDCELMultipleVertexIntersection(vList));
+		ep = events_popfront();
+	}
+	currentEvent = &ep;
 
 #ifdef DEBUG
 	std::cerr << "Merging same-position events done. Arrangement structure.\n";

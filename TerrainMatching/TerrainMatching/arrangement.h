@@ -472,8 +472,8 @@ private:
 	static ArrangementVertex* handleIntersectionEvent(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2);
 	static ArrangementVertex* updateDCELIntersection(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2, double int_x, double int_y);
 	static ArrangementVertex* updateDCELProperIntersection(ArrangementEdgeData *ed1, ArrangementEdgeData *ed2, double int_x, double int_y);
-	static ArrangementEdgeData* updateDCELVertexEdgeIntersection(ArrangementVertex *v, ArrangementEdgeData *ed, bool survive_v);
-	static void updateDCEL2VertexIntersection(ArrangementVertex *v, ArrangementVertex *v_erase);
+	static ArrangementVertex* updateDCELVertexEdgeIntersection(ArrangementVertex *v, ArrangementEdgeData *ed);
+	static ArrangementVertex* updateDCELMultipleVertexIntersection(std::vector<ArrangementVertex *> &vList);
 
 public:
 	SweepLine() {}
